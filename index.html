@@ -112,6 +112,7 @@ main { width: min(1500px, 100%); margin: 0 auto; padding: 12px; }
 
 .truck-cell { grid-area: truck; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .truck-id { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.truck-line { display: inline-flex; align-items: baseline; gap: 8px; }
 .crew-anchor { position: relative; display: inline-flex; }
 .truck-number { padding: 0; border: 0; border-bottom: 1px dotted var(--dim); color: var(--text); background: transparent; cursor: help; font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 30px; font-weight: 800; line-height: 1.05; letter-spacing: -.03em; }
 .truck-number:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
@@ -763,8 +764,8 @@ function rowHtml(s, nowMs){
     : '<span class="load-number" title="SOS link unavailable">'+esc(loadNum)+'</span>';
   const trailer = (s.trailer||"").trim();
   return '<article class="stop-row '+urgencyClass(s.appt,nowMs)+(gpsInfo.atStop?" gps-at-stop":"")+'">'+
-    '<div class="truck-cell"><span class="truck-id">'+crewTooltipHtml(s)+
-      (trailer?'<span class="trailer-tag">'+esc(trailer)+'</span>':"")+
+    '<div class="truck-cell"><span class="truck-id"><span class="truck-line">'+crewTooltipHtml(s)+
+      (trailer?'<span class="trailer-tag">'+esc(trailer)+'</span>':"")+'</span>'+
       gpsMarkHtml(s,nowMs)+'</span><span class="type-mark '+truckTypeWord(s)+'">'+typeLabel(s)+'</span></div>'+
     '<div class="load-cell">'+loadHtml+nextLoadHtml(s)+'<span>'+esc(brokerRefLine(s))+'</span></div>'+
     '<div class="st-cell"><span class="mobile-label">ST&nbsp;</span><span class="st-code">'+esc(s.st||"—")+'</span></div>'+
