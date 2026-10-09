@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Pending Stops — Prointermodal</title>
+<style>
+:root {
+  --bg: #e8eef1;
+  --surface: #f8fafb;
+  --surface-strong: #ffffff;
+  --text: #10263b;
+  --dim: #596d7c;
+  --border: #c7d2d9;
+  --accent: #0f7a4f;
+  --amber: #d97706;
+  --danger: #b42318;
+  --navy: #10263b;
+  --blue: #2763a3;
+  --radius: 8px;
+}
+:root[data-theme="dark"] {
+  --bg: #0c1721;
+  --surface: #132432;
+  --surface-strong: #182c3c;
+  --text: #ecf4f7;
+  --dim: #9fb1bc;
+  --border: #314653;
+  --accent: #43c58a;
+  --amber: #f4a340;
+  --danger: #ff776d;
+  --navy: #07131d;
+  --blue: #5b9bd5;
+}
+* { box-sizing: border-box; }
+html { background: var(--bg); }
+body { margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+button, input, textarea, select { font: inherit; }
+button { -webkit-tap-highlight-color: transparent; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+.app-shell { min-height: 100vh; background: var(--bg); padding-bottom: max(28px, env(safe-area-inset-bottom)); }
+.signal-bar { position: sticky; top: 0; z-index: 30; min-height: 48px; padding: 8px 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: #eaf2f6; background: var(--navy); border-bottom: 1px solid rgba(255,255,255,.12); }
+:root[data-theme="dark"] .signal-bar { color: var(--text); }
+.brand { font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 15px; font-weight: 800; letter-spacing: .06em; margin-right: auto; white-space: nowrap; }
+.theme-btn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 1px solid rgba(255,255,255,.26); border-radius: 5px; color: #eaf2f6; background: transparent; cursor: pointer; }
+:root[data-theme="dark"] .theme-btn { color: var(--text); border-color: var(--border); }
+.theme-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
+.theme-btn .icon-sun { display: none; }
+:root[data-theme="dark"] .theme-btn .icon-sun { display: block; }
+:root[data-theme="dark"] .theme-btn .icon-moon { display: none; }
+.notes-chip { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 6px 11px; border: 1px solid rgba(255,255,255,.26); border-radius: 5px; color: #eaf2f6; background: transparent; font-size: 12px; font-weight: 750; white-space: nowrap; }
+:root[data-theme="dark"] .notes-chip { color: var(--text); border-color: var(--border); }
+.updated-chip { display: inline-flex; align-items: center; gap: 4px; min-height: 34px; padding: 6px 11px; border: 1px solid rgba(255,255,255,.18); border-radius: 5px; color: #c9d8e2; background: rgba(255,255,255,.04); font-size: 12px; font-weight: 600; white-space: nowrap; }
+:root[data-theme="dark"] .updated-chip { color: var(--dim); border-color: var(--border); background: rgba(255,255,255,.02); }
+.notes-chip .nd { width: 8px; height: 8px; border-radius: 50%; background: #f4a340; animation: pulse 1.3s ease-in-out infinite; }
+.notes-chip.live .nd { background: #43c58a; animation: none; }
+
+main { width: min(1500px, 100%); margin: 0 auto; padding: 12px; }
+.type-mark { display: inline-flex; align-items: center; min-height: 21px; padding: 3px 7px; border-radius: 3px; color: white; font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.type-mark.pickup { background: var(--blue); }
+.type-mark.delivery { background: var(--accent); }
+.arrival-pill { flex: 0 0 auto; align-self: center; display: inline-flex; align-items: center; min-height: 20px; padding: 2px 9px; border-radius: 999px; color: #fff; font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 10px; font-weight: 800; letter-spacing: .07em; white-space: nowrap; }
+.arrival-pill.onsite { background: var(--accent); }
+.arrival-pill.enroute { background: #64727d; }
+.arrival-pill.gps { background: var(--amber); }
+.stop-row.gps-at-stop { border-left-color: var(--amber); }
+
+.controls { margin: 4px 0 10px; }
+.counts { display: flex; align-items: center; gap: 8px 14px; flex-wrap: wrap; color: var(--dim); font-size: 12px; }
+.counts strong { color: var(--text); font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 20px; }
+.counts i { display: inline-block; width: 16px; height: 3px; margin-right: 5px; vertical-align: middle; }
+.pickup-line { background: var(--blue); }
+.delivery-line { background: var(--accent); }
+.late-toggle { padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; color: var(--danger); background: transparent; font-size: 12px; font-weight: 700; cursor: pointer; }
+.late-toggle.active { color: white; border-color: var(--danger); background: var(--danger); }
+.gps-toggle { padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; color: var(--amber); background: transparent; font-size: 12px; font-weight: 700; cursor: pointer; }
+.gps-toggle.active { color: white; border-color: var(--amber); background: var(--amber); }
+.filter-row { margin-top: 12px; display: flex; flex-direction: column; gap: 9px; }
+.search-box { min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-strong); }
+.search-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(15,122,79,.18); }
+.search-box svg { width: 19px; height: 19px; fill: none; stroke: var(--dim); stroke-width: 1.8; }
+.search-box input { min-width: 0; flex: 1; border: 0; outline: 0; color: var(--text); background: transparent; font-size: 14px; }
+.search-box input::placeholder { color: var(--dim); }
+.type-filter { display: flex; flex: 0 0 auto; min-height: 44px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-strong); overflow: hidden; }
+.type-filter-btn { flex: 1; padding: 0 12px; border: 0; border-left: 1px solid var(--border); color: var(--dim); background: transparent; font-size: 12.5px; font-weight: 750; white-space: nowrap; cursor: pointer; }
+.type-filter-btn:first-child { border-left: 0; }
+.type-filter-btn[aria-pressed="true"] { color: #fff; background: var(--navy); }
+.type-filter-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.dispatch-select { flex: 0 0 auto; min-height: 44px; max-width: 100%; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-strong); color: var(--text); font-size: 12.5px; font-weight: 750; cursor: pointer; }
+.dispatch-select:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+.report-list { margin-top: 10px; }
+.desktop-head { display: none; }
+.type-section { margin-top: 20px; }
+.type-section:first-child { margin-top: 0; }
+.section-head { margin: 0; padding: 8px 14px; display: flex; align-items: center; gap: 10px; color: #fff; font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 14px; font-weight: 800; letter-spacing: .09em; }
+.section-head.pickup { background: var(--blue); }
+.section-head.delivery { background: var(--accent); }
+.section-head .section-count { margin-left: auto; padding: 2px 10px; border-radius: 12px; background: rgba(255,255,255,.22); font-family: system-ui, sans-serif; font-size: 11px; font-weight: 800; letter-spacing: .03em; }
+.section-empty { margin: 10px 0 2px; padding: 16px 14px; border: 1px dashed var(--border); color: var(--dim); text-align: center; font-size: 13px; }
+.date-group { margin-top: 18px; }
+.date-group h2 { margin: 0 0 7px; display: flex; align-items: center; gap: 8px; color: var(--text); font-size: 13px; font-weight: 800; text-transform: capitalize; }
+.date-group h2::after { content: ""; height: 1px; flex: 1; background: var(--border); }
+.date-group h2 span { order: 2; min-width: 24px; padding: 2px 6px; border-radius: 10px; color: var(--dim); background: var(--surface); text-align: center; font-size: 11px; }
+.rows { display: flex; flex-direction: column; gap: 7px; }
+
+.stop-row { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); grid-template-areas: "truck load" "st appt" "time time" "miles miles" "place place" "note note"; gap: 9px 12px; padding: 13px; border: 1px solid var(--border); border-left: 4px solid transparent; background: var(--surface-strong); box-shadow: 0 2px 8px rgba(16,38,59,.05); }
+.stop-row.late { border-left-color: var(--danger); }
+.stop-row.soon { border-left-color: var(--amber); }
+
+.truck-cell { grid-area: truck; display: flex; align-items: center; gap: 8px; min-width: 0; }
+.truck-id { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.crew-anchor { position: relative; display: inline-flex; }
+.truck-number { padding: 0; border: 0; border-bottom: 1px dotted var(--dim); color: var(--text); background: transparent; cursor: help; font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 30px; font-weight: 800; line-height: 1.05; letter-spacing: -.03em; }
+.truck-number:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+.trailer-tag { color: var(--dim); font-size: 11px; font-weight: 700; letter-spacing: .04em; }
+.crew-tooltip { position: absolute; left: 0; top: calc(100% + 8px); z-index: 40; width: max-content; max-width: min(290px, calc(100vw - 48px)); padding: 10px 12px; display: flex; flex-direction: column; gap: 1px; pointer-events: none; visibility: hidden; opacity: 0; transform: translateY(-3px); border: 1px solid rgba(255,255,255,.14); border-radius: 5px; color: #eef5f8; background: #0b1c2b; box-shadow: 0 10px 24px rgba(4,15,24,.28); font-size: 12px; line-height: 1.45; transition: opacity .12s ease, transform .12s ease, visibility .12s; }
+.crew-anchor:hover .crew-tooltip, .crew-anchor:focus-within .crew-tooltip, .crew-anchor.force .crew-tooltip { visibility: visible; opacity: 1; transform: translateY(0); }
+.crew-role { color: #9fb8c6; font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.crew-tooltip strong { font-size: 13px; }
+.crew-divider { height: 1px; margin: 7px 0 5px; background: rgba(255,255,255,.16); }
+
+.gps-mark { flex: 0 0 auto; display: inline-flex; align-items: center; min-height: 17px; padding: 1px 8px; border-radius: 999px; color: #fff; font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 10px; font-weight: 800; letter-spacing: .08em; white-space: nowrap; }
+.gps-mark.on { background: var(--accent); }
+.gps-mark.off { background: var(--danger); }
+a.gps-mark { text-decoration: none; }
+a.gps-mark.on { cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); transition: filter .12s ease, box-shadow .12s ease; }
+a.gps-mark.on:hover { filter: brightness(1.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,.55), 0 0 0 2px rgba(15,122,79,.35); }
+a.gps-mark.on:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; filter: brightness(1.12); }
+
+.load-cell { grid-area: load; display: flex; align-items: flex-end; flex-direction: column; gap: 1px; min-width: 0; color: var(--dim); text-align: right; font-size: 12px; }
+.load-cell > span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.load-number { flex: 0 0 auto; color: var(--text); font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 14px; font-weight: 800; }
+a.load-number { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+a.load-number:hover, a.load-number:focus-visible { color: var(--navy); }
+a.next-load { font-size: 12px; font-weight: 700; }
+.external-mark { margin-left: 3px; font-family: system-ui, sans-serif; font-size: 11px; }
+
+.st-cell { grid-area: st; display: flex; align-items: center; }
+.st-code { font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 20px; font-weight: 800; letter-spacing: .02em; color: var(--text); }
+
+.appointment-cell { grid-area: appt; min-width: 0; display: flex; align-items: baseline; gap: 5px; color: var(--dim); justify-content: flex-end; }
+.appointment-cell strong { color: var(--text); font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 17px; }
+.stop-row.soon .appointment-cell strong { color: var(--amber); }
+.stop-row.late .appointment-cell strong { color: var(--danger); }
+
+.time-cell { grid-area: time; min-width: 0; display: flex; align-items: baseline; gap: 6px; color: var(--dim); font-size: 13px; }
+.time-rel { font-weight: 700; }
+.time-rel.past { color: var(--danger); }
+.eta-anchor { position: relative; display: inline-flex; }
+.eta-value { padding: 0; border: 0; border-bottom: 1px dotted var(--dim); color: var(--text); background: transparent; font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 14px; font-weight: 800; cursor: help; }
+.eta-value:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+.time-cell.late .eta-value { color: var(--danger); border-bottom-color: var(--danger); }
+.time-cell.late .eta-label { color: var(--danger); font-weight: 700; }
+.eta-tooltip { position: absolute; left: 0; top: calc(100% + 8px); z-index: 45; width: min(320px, calc(100vw - 48px)); padding: 11px 12px; display: flex; flex-direction: column; gap: 5px; pointer-events: none; visibility: hidden; opacity: 0; transform: translateY(-3px); border: 1px solid rgba(255,255,255,.14); border-radius: 5px; color: #eef5f8; background: #0b1c2b; box-shadow: 0 10px 24px rgba(4,15,24,.28); font-size: 12px; line-height: 1.45; transition: opacity .12s ease, transform .12s ease, visibility .12s; }
+.eta-tooltip strong { color: white; font-size: 13px; }
+.eta-tooltip small { color: #9fb8c6; font-size: 10px; }
+.eta-anchor:hover .eta-tooltip, .eta-anchor:focus-within .eta-tooltip, .eta-anchor.force .eta-tooltip { visibility: visible; opacity: 1; transform: translateY(0); }
+.eta-hos { white-space: nowrap; }
+.hos-risk-inline { color: #ff776d; font-weight: 800; }
+
+.miles-cell { grid-area: miles; display: flex; align-items: baseline; gap: 5px; color: var(--dim); }
+.miles-cell strong { color: var(--text); font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 17px; }
+.miles-wrap { display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.route-btn { display: inline-flex; align-items: center; justify-content: center; width: 29px; height: 29px; padding: 0; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); color: var(--accent); cursor: pointer; text-decoration: none; }
+.route-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.route-btn:hover { border-color: var(--accent); }
+.route-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.stop-progress { display: inline-flex; align-items: center; min-height: 22px; padding: 1px 8px; border: 1px solid var(--border); border-radius: 999px; color: var(--dim); background: var(--surface); font-size: 10px; font-weight: 800; letter-spacing: .05em; white-space: nowrap; }
+
+.place-cell { grid-area: place; display: flex; align-items: flex-start; flex-wrap: wrap; gap: 8px; color: var(--text); font-size: 13px; line-height: 1.4; }
+.mobile-label { font-size: 10px; font-weight: 800; text-transform: uppercase; color: var(--dim); }
+
+.note-cell { grid-area: note; min-width: 0; display: flex; justify-content: flex-end; }
+.note-button { max-width: 190px; padding: 3px 0; overflow: hidden; border: 0; color: var(--dim); background: transparent; text-align: right; text-decoration: underline dotted; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; cursor: pointer; }
+.note-button:not(:hover) { text-decoration-color: var(--border); }
+.note-form { width: 100%; }
+.note-form textarea { width: 100%; padding: 8px; resize: vertical; border: 1px solid var(--border); border-radius: 5px; outline: none; color: var(--text); background: var(--bg); font-size: 12px; }
+.note-form textarea:focus { border-color: var(--accent); }
+.note-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 5px; }
+.text-button, .save-button { min-height: 30px; padding: 4px 9px; border-radius: 4px; font-size: 11px; font-weight: 750; cursor: pointer; }
+.text-button { border: 0; color: var(--dim); background: transparent; }
+.save-button { border: 1px solid var(--accent); color: white; background: var(--accent); }
+
+.no-results { margin: 0 0 10px; padding: 12px 14px; display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; border: 1px dashed var(--border); }
+.no-results strong { font-size: 15px; }
+.no-results span { flex: 1 1 180px; color: var(--dim); font-size: 13px; }
+.no-results button { min-height: 36px; padding: 7px 12px; border: 0; border-radius: 5px; color: white; background: var(--navy); font-weight: 750; cursor: pointer; }
+.loading-shell { min-height: 100vh; display: grid; place-content: center; padding: 24px; text-align: center; background: var(--bg); }
+.loading-shell p { color: var(--dim); font-size: 13px; }
+[hidden] { display: none !important; }
+.loading-rule { width: 120px; height: 4px; margin: 0 auto 14px; background: linear-gradient(90deg, var(--accent) 50%, var(--border) 50%); background-size: 200% 100%; animation: loading 1.2s linear infinite; }
+
+@keyframes pulse { 50% { opacity: .4; } }
+@keyframes loading { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
+
+@media (min-width: 760px) {
+  main { padding: 20px 24px 44px; }
+  .filter-row { flex-direction: row; align-items: center; }
+  .search-box { flex: 1; }
+  .type-filter-btn { padding-left: 18px; padding-right: 18px; }
+}
+
+@media (min-width: 1100px) {
+  .desktop-head { display: grid; grid-template-columns: 100px minmax(140px,.95fr) 56px 140px 150px 100px minmax(210px,1.6fr) minmax(120px,.8fr); gap: 14px; padding: 9px 14px; color: var(--dim); border-bottom: 2px solid var(--navy); font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+  .stop-row { grid-template-columns: 100px minmax(140px,.95fr) 56px 140px 150px 100px minmax(210px,1.6fr) minmax(120px,.8fr); grid-template-areas: "truck load st appointment time miles place note"; gap: 14px; align-items: center; min-height: 74px; padding: 9px 14px; box-shadow: none; }
+  .truck-number { font-size: 24px; }
+  .truck-cell { align-items: flex-start; flex-direction: column; gap: 2px; }
+  .load-cell { align-items: flex-start; text-align: left; }
+  .load-cell > span:last-child { white-space: normal; }
+  .st-code { font-size: 17px; }
+  .appointment-cell { flex-direction: column; align-items: flex-start; gap: 0; justify-content: center; }
+  .time-cell { flex-direction: column; align-items: flex-start; gap: 2px; }
+  .eta-value { font-size: 15px; }
+  .eta-tooltip { left: 0; }
+  .miles-cell { flex-direction: column; align-items: flex-start; gap: 0; }
+  .place-cell { align-items: center; }
+  .mobile-label { display: none; }
+  .note-cell { justify-content: flex-start; }
+  .note-button { text-align: left; }
+}
+@media (max-width: 480px) {
+  .notes-chip, .updated-chip { padding: 6px 9px; font-size: 11px; }
+  .brand { font-size: 13px; }
+}
+</style>
+</head>
+<body>
+<div class="app-shell">
+  <header class="signal-bar">
+    <span class="brand">PENDING STOPS</span>
+    <button type="button" class="theme-btn" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">
+      <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>
+    </button>
+    <span class="updated-chip" id="updated-chip" hidden>Last SOS update: <span id="updated-text"></span></span>
+    <span class="updated-chip" id="gps-chip" hidden>Last GPS update: <span id="gps-text"></span></span>
+    <span class="notes-chip" id="notes-chip"><span class="nd"></span><span id="notes-text">Notes · connecting</span></span>
+  </header>
+
+  <main>
+    <div id="loading" class="loading-shell">
+      <div>
+        <div class="loading-rule"></div>
+        <p>Loading live stops…</p>
+      </div>
+    </div>
+
+    <div id="board" hidden>
+      <section class="controls" aria-label="Report filters">
+        <div class="counts" aria-label="Summary">
+          <span><strong id="c-stops">0</strong> stops</span>
+          <span><i class="pickup-line"></i><span id="c-pick">0</span> pickups</span>
+          <span><i class="delivery-line"></i><span id="c-del">0</span> deliveries</span>
+          <button class="late-toggle" id="late-toggle" aria-pressed="false"><span id="c-late">0</span> late ETA</button>
+          <button class="gps-toggle" id="gps-toggle" aria-pressed="false" title="Trucks whose GPS is already at the stop but SOS arrival is not signed yet"><span id="c-gps-at-stop">0</span> at stop · SOS pending</button>
+        </div>
+        <div class="filter-row">
+          <label class="search-box">
+            <span class="sr-only">Search report</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6"></circle><path d="m16 16 4 4"></path></svg>
+            <input type="search" id="q" placeholder="Truck, load, ref #, broker or city" autocomplete="off">
+          </label>
+          <div class="type-filter" role="group" aria-label="Filter by stop type">
+            <button type="button" class="type-filter-btn" data-type="all" aria-pressed="true">Pick ups + deliveries</button>
+            <button type="button" class="type-filter-btn" data-type="P" aria-pressed="false">Pick ups</button>
+            <button type="button" class="type-filter-btn" data-type="D" aria-pressed="false">Deliveries</button>
+          </div>
+          <select id="dispatcher" class="dispatch-select" aria-label="Filter by dispatcher" hidden></select>
+        </div>
+      </section>
+
+      <section class="report-list" aria-label="Pending stops">
+        <p id="feed-note" class="section-empty" hidden>Live data hasn't arrived yet — the board fills in automatically as soon as the feed connects.</p>
+        <div id="groups"></div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"></script>
+<script>
+"use strict";
+/* ===== data (stops arrive live from Firebase /stops) ===== */
+let STOPS = [];
+let DATA_LOADED = false;
+let NOW_ETA = new Date();
+
+const TZ = "America/New_York";
+const FIREBASE_URL = "https://change-of-shift-prointermodal-default-rtdb.firebaseio.com";
+
+/* ===== theme (explicit toggle, persisted; defaults to system) ===== */
+(function initTheme(){
+  let t = null;
+  try { t = localStorage.getItem("ps-theme"); } catch(e) {}
+  if (t !== "light" && t !== "dark") {
+    t = (window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
+  }
+  document.documentElement.dataset.theme = t;
+})();
+document.getElementById("theme-toggle").addEventListener("click", function(){
+  const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("ps-theme", next); } catch(e) {}
+});
+
+/* ===== helpers ===== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtDay = new Intl.DateTimeFormat("en-US",{timeZone:TZ,weekday:"long",month:"long",day:"numeric"});
+const fmtCA = new Intl.DateTimeFormat("en-CA",{timeZone:TZ});
+const fmtApptParts = new Intl.DateTimeFormat("en-US",{timeZone:TZ,month:"2-digit",day:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit",hour12:true});
+function fmtAppt(d){
+  if(!d || isNaN(d.getTime())) return "—";
+  const p={};
+  fmtApptParts.formatToParts(d).forEach(x=>{ p[x.type]=x.value; });
+  return p.month+"/"+p.day+"/"+p.year+" "+p.hour+":"+p.minute+" "+p.dayPeriod;
+}
+const fmtEtaT = new Intl.DateTimeFormat("en-US",{timeZone:TZ,hour:"numeric",minute:"2-digit"});
+const fmtEtaD = new Intl.DateTimeFormat("en-US",{timeZone:TZ,weekday:"short",month:"short",day:"numeric"});
+const fmtUpd = new Intl.DateTimeFormat("en-US",{timeZone:TZ,day:"2-digit",month:"short",hour:"numeric",minute:"2-digit"});
+function fmtNum(n){ return Number(n).toLocaleString("en-US",{maximumFractionDigits:1}); }
+function fmtDur(mins){
+  mins = Math.round(mins);
+  const h = Math.floor(mins/60), m = mins%60;
+  if(h>=48) return Math.floor(h/24)+"d "+(h%24)+"h";
+  if(h<1) return m+"m";
+  return h+"h "+String(m).padStart(2,"0")+"m";
+}
+function urgencyClass(iso, nowMs){
+  const minutes = (new Date(iso).getTime()-nowMs)/60000;
+  if(minutes<0) return "late";
+  if(minutes<=180) return "soon";
+  return "scheduled";
+}
+function firstNum(){
+  for(const v of arguments){
+    if(v==null||v==="") continue;
+    const n=Number(v);
+    if(isFinite(n)) return n;
+  }
+  return null;
+}
+function fmtAge(ms){
+  if(!(ms>0)) return "";
+  const mins=Math.floor(ms/60000);
+  const days=Math.floor(mins/1440), hours=Math.floor((mins%1440)/60), m=mins%60;
+  if(days>0) return days+"d "+hours+"h";
+  if(hours>0) return hours+"h "+String(m).padStart(2,"0")+"m";
+  return m+"m";
+}
+function fmtHos(mins){
+  if(mins==null) return "—";
+  mins=Math.max(0,Math.round(mins));
+  const h=Math.floor(mins/60), m=mins%60;
+  return h+":"+String(m).padStart(2,"0");
+}
+
+/* ===== shared notes (Firebase Realtime Database) ===== */
+const NOTES = {};
+const notesRefHolder = { ref: null, online: false };
+let EDITING = null;
+
+function paintNotesChip(){
+  const chip = $("notes-chip"), online = notesRefHolder.online;
+  chip.classList.toggle("live", online);
+  $("notes-text").textContent = online ? "Notes · live" : "Notes · offline";
+}
+function normStop(s){
+  if(!s.id) s.id=String(s.t||"d").toLowerCase()+":"+(s.load||"")+":"+(s.truck||"");
+  let t="";
+  if(s.t!=null) t=String(s.t).toUpperCase().startsWith("P")?"P":"D";
+  else { const ty=String(s.type||"P").toUpperCase(); t=ty.startsWith("D")?"D":"P"; }
+  s.t=t;
+  if(s.miles!=null && s.miles!==""){
+    const n=(typeof s.miles==="number")?s.miles:Number(s.miles);
+    s.miles=isFinite(n)?n:null;
+  }
+  if(s.hos&&typeof s.hos==="object"){
+    const h=s.hos;
+    ["driveMin","shiftMin","cycleMin"].forEach(function(k){
+      const raw=h[k];
+      const n=(typeof raw==="number")?raw:Number(raw);
+      h[k]=(raw==null||raw===""||!isFinite(n))?null:n;
+    });
+  }
+  return s;
+}
+function initNotes(db){
+  const ref=db.ref("notes");
+  notesRefHolder.ref=ref;
+  ref.on("value", snap=>{
+    const v=snap.val()||{};
+    Object.keys(v).forEach(k=>{ const it=v[k]; NOTES[k]=(it&&typeof it.text==="string")?it.text:""; });
+    Object.keys(NOTES).forEach(k=>{ if(!(k in v)) delete NOTES[k]; });
+    if(DATA_LOADED) render();
+  }, err=>{ console.error("notes read",err); });
+}
+
+/* ===== meta chips ===== */
+let META_SOS_UPDATED = null;
+let META_GPS_UPDATED = null;
+function stopGpsRaw(s){
+  const g=s.gps;
+  if(g&&typeof g==="object"&&g.ts) return g.ts;
+  return null;
+}
+function freshestStopGpsMs(){
+  let best=null;
+  for(const s of STOPS){
+    const t=stopGpsRaw(s);
+    if(!t) continue;
+    const ms=new Date(t).getTime();
+    if(isNaN(ms)) continue;
+    if(best==null||ms>best) best=ms;
+  }
+  return best;
+}
+function paintGpsChip(){
+  const chip=$("gps-chip");
+  if(!chip) return;
+  let ms=META_GPS_UPDATED;
+  const fromJob=ms!=null;
+  if(ms==null) ms=freshestStopGpsMs();
+  const t=(ms!=null)?new Date(ms):null;
+  if(!t||isNaN(t.getTime())){ chip.hidden=true; return; }
+  chip.title=fromJob?"Last GPS refresh":"Freshest GPS reading across the trucks on this board";
+  $("gps-text").textContent=fmtUpd.format(t);
+  chip.hidden=false;
+}
+function paintSosChip(){
+  const chip=$("updated-chip");
+  const t=(META_SOS_UPDATED!=null)?new Date(META_SOS_UPDATED):null;
+  if(!t||isNaN(t.getTime())){ chip.hidden=true; return; }
+  $("updated-text").textContent=fmtUpd.format(t);
+  chip.hidden=false;
+}
+function initMeta(db){
+  const readSos = snap=>{
+    const v=snap.val(), t=v?new Date(v):null;
+    META_SOS_UPDATED=(t&&!isNaN(t))?t.getTime():null;
+    paintSosChip();
+  };
+  db.ref("meta/lastApiMirror").on("value", snap=>{
+    if(snap.val()!=null) readSos(snap);
+    else db.ref("meta/lastUpdated").once("value").then(readSos);
+  }, err=>{ console.error("meta read",err); });
+  db.ref("meta/lastGpsUpdate").on("value", snap=>{
+    const v=snap.val(), t=v?new Date(v):null;
+    META_GPS_UPDATED=(t&&!isNaN(t))?t.getTime():null;
+    paintGpsChip();
+  }, err=>{ console.error("meta gps read",err); });
+}
+function initStops(db){
+  db.ref("stops").on("value", snap=>{
+    const v=snap.val(), arr=[];
+    if(Array.isArray(v)) v.forEach(s=>{ if(s) arr.push(s); });
+    else if(v&&typeof v==="object") Object.keys(v).forEach(k=>{ const s=v[k]; if(s) arr.push(s); });
+    arr.forEach(normStop);
+    STOPS=arr; DATA_LOADED=true; NOW_ETA=new Date(); paintGpsChip();
+    render();
+  }, err=>{ console.error("stops read",err); });
+}
+let LOAD_FALLBACK=null;
+function armLoadFallback(){
+  if(LOAD_FALLBACK!=null) return;
+  LOAD_FALLBACK=setTimeout(()=>{ if(!DATA_LOADED) render(); }, 10000);
+}
+function initFirebase(){
+  armLoadFallback();
+  try{
+    if(typeof firebase==="undefined" || !firebase.database) throw new Error("lib");
+    /* databaseURL only — RTDB reads are public, no API key needed */
+    firebase.initializeApp({ databaseURL: FIREBASE_URL });
+    const db=firebase.database();
+    db.ref(".info/connected").on("value", snap=>{
+      notesRefHolder.online = !!snap.val();
+      paintNotesChip();
+    });
+    initStops(db);
+    initNotes(db);
+    initMeta(db);
+  }catch(e){
+    console.error("firebase init", e);
+    render();
+  }
+}
+function saveNote(key, text){
+  NOTES[key]=text;
+  const ref=notesRefHolder.ref;
+  if(!ref) return;
+  ref.child(key).set({text, ts: Date.now()}).catch(err=>{
+    console.error("notes write",err);
+    notesRefHolder.online=false; paintNotesChip();
+  });
+}
+
+/* ===== board ===== */
+const state={ q:"", lateOnly:false, gpsAtStopOnly:false, type:"all", dispatcher:"all" };
+
+function isLateStop(s){ return s.isLate===true || s.isLate===1; }
+function filtered(){
+  const q=state.q.trim().toLowerCase();
+  const nowMs=Date.now();
+  return STOPS.filter(s=>{
+    if(state.lateOnly && !isLateStop(s)) return false;
+    if(state.gpsAtStopOnly && !isGpsAtStop(s, nowMs)) return false;
+    if(state.type!=="all" && s.t!==state.type) return false;
+    if(state.dispatcher!=="all"){
+      const d=String(s.dispatcher==null?"":s.dispatcher).trim();
+      if(d.toLowerCase()!==state.dispatcher.toLowerCase()) return false;
+    }
+    if(q){
+      const atStop=isGpsAtStop(s, nowMs);
+      const hay=(s.truck+" "+s.load+" "+(s.ref||"")+" "+(s.broker||"")+" "+(s.addr||"")+" "+(s.st||"")+" "+(NOTES[s.id]||"")+" "+(s.drv||"")+" "+(s.co||"")+" "+(s.dispatcher||"")+" "+(s.hosRisk?"hos risk":"")+" "+(atStop?"gps at stop sos pending arrived":"")).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+}
+
+/* ===== GPS helpers ===== */
+function truckCoords(s){
+  const g=(s.gps&&typeof s.gps==="object")?s.gps:null;
+  const lat=firstNum(g?g.lat:null);
+  const lon=firstNum(g?g.lng:null);
+  if(lat==null||lon==null||!isFinite(lat)||!isFinite(lon)) return null;
+  if(Math.abs(lat)>90||Math.abs(lon)>180) return null;
+  return {lat:lat, lng:lon};
+}
+function stopCoords(s){
+  const lat=firstNum(s.stopLat), lng=firstNum(s.stopLng);
+  if(lat==null||lng==null||!isFinite(lat)||!isFinite(lng)) return null;
+  if(Math.abs(lat)>90||Math.abs(lng)>180) return null;
+  return {lat:lat,lng:lng};
+}
+const GPS_FRESH_MS = 12*60*60*1000;
+function gpsActive(s, nowMs){
+  if(!truckCoords(s)) return false;
+  const raw=stopGpsRaw(s);
+  const t=raw?new Date(raw):null;
+  if(!t||isNaN(t.getTime())) return true;
+  return nowMs-t.getTime()<GPS_FRESH_MS;
+}
+function samsaraUrl(raw){
+  const v=raw!=null?String(raw).trim():"";
+  if(!/^https:\/\//i.test(v)) return null;
+  try{
+    const u=new URL(v);
+    if(u.hostname!=="cloud.samsara.com") return null;
+    return u.href;
+  }catch(e){ return null; }
+}
+function truckLocationUrl(s){
+  const dev=samsaraUrl(s.deviceUrl);
+  if(dev) return dev;
+  const sr=(s.samsaraRoute&&typeof s.samsaraRoute==="object")?s.samsaraRoute:null;
+  return samsaraUrl(sr?sr.liveUrl:null);
+}
+function gpsMarkHtml(s, nowMs){
+  const on=gpsActive(s, nowMs);
+  const raw=stopGpsRaw(s);
+  const t=raw?new Date(raw):null;
+  const age=(t&&!isNaN(t))?fmtAge(nowMs-t.getTime()):"";
+  const title=on
+    ? (age?"GPS live · updated "+age+" ago":"GPS live")
+    : (age?"GPS inactive · last fix "+age+" ago":"GPS inactive");
+  if(on){
+    const url=truckLocationUrl(s);
+    if(url){
+      return '<a class="gps-mark on" href="'+esc(url)+'" target="_blank" rel="noopener"'+
+        ' title="'+esc(title+" · view truck location in Samsara (opens in a new window)")+'" aria-label="View truck '+esc(s.truck)+' live location in Samsara (opens in a new window)">gps on</a>';
+    }
+    return '<span class="gps-mark on" title="'+esc(title)+'">gps on</span>';
+  }
+  return '<span class="gps-mark off" title="'+esc(title)+'">gps off</span>';
+}
+
+/* ===== arrival / departure pills ===== */
+function arrivalState(s){
+  const has=v=>v!=null&&String(v).trim()!=="";
+  const arrived=has(s.arrivedTs);
+  const departed=has(s.departedTs);
+  if(!arrived&&!departed) return null;
+  return (arrived&&!departed)?"onsite":"enroute";
+}
+function arrivalPillHtml(s){
+  const st=arrivalState(s);
+  if(!st) return "";
+  return st==="onsite"
+    ? '<span class="arrival-pill onsite">ON SITE</span>'
+    : '<span class="arrival-pill enroute">EN ROUTE</span>';
+}
+const GPS_AT_STOP_RADIUS_MI = 0.5;
+function haversineMiles(a,b){
+  if(!a||!b) return null;
+  const R=3958.8, toRad=function(d){ return d*Math.PI/180; };
+  const dLat=toRad(b.lat-a.lat), dLng=toRad(b.lng-a.lng);
+  const s1=Math.sin(dLat/2), s2=Math.sin(dLng/2);
+  const h=s1*s1+Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*s2*s2;
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));
+}
+function gpsAtStopInfo(s, nowMs){
+  const empty={atStop:false, distMiles:null, gpsAgeMs:null};
+  if(arrivalState(s)==="onsite") return empty;
+  const raw=stopGpsRaw(s);
+  const gt=raw?new Date(raw):null;
+  const gpsAgeMs=(gt&&!isNaN(gt.getTime()))?(nowMs-gt.getTime()):null;
+  const distMiles=haversineMiles(truckCoords(s), stopCoords(s));
+  if(typeof s.gpsAtStop==="boolean"){
+    if(s.arrivedTs) return empty;
+    return {atStop:s.gpsAtStop, distMiles:distMiles, gpsAgeMs:gpsAgeMs};
+  }
+  if(s.arrivedTs) return empty;
+  if(gpsAgeMs==null || gpsAgeMs>GPS_FRESH_MS) return {atStop:false, distMiles:null, gpsAgeMs:gpsAgeMs};
+  if(distMiles==null) return empty;
+  return {atStop:distMiles<=GPS_AT_STOP_RADIUS_MI, distMiles:distMiles, gpsAgeMs:gpsAgeMs};
+}
+function isGpsAtStop(s, nowMs){ return gpsAtStopInfo(s, nowMs).atStop; }
+function gpsAtStopPillHtml(s, nowMs){
+  const info=gpsAtStopInfo(s, nowMs);
+  if(!info.atStop) return "";
+  const distTxt=(info.distMiles!=null)?(info.distMiles<0.1?"<0.1 mi":info.distMiles.toFixed(1)+" mi"):"at stop";
+  const ageTxt=(info.gpsAgeMs!=null)?(" · GPS "+fmtAge(info.gpsAgeMs)+" ago"):"";
+  const title="GPS shows truck at the stop ("+distTxt+")"+ageTxt+" — SOS arrival not signed yet";
+  return '<span class="arrival-pill gps" title="'+esc(title)+'" aria-label="'+esc(title)+'">GPS AT STOP · please sign SOS</span>';
+}
+
+/* ===== reload (next load) ===== */
+function nextLoadHtml(s){
+  const nl=(s.nextLoad&&typeof s.nextLoad==="object")?s.nextLoad:null;
+  if(!nl) return "";
+  /* only show when the next pickup is today or past (feed may pre-filter) */
+  if(nl.appt){
+    const ms=new Date(nl.appt).getTime();
+    if(!isNaN(ms)){
+      const endOfToday=new Date(); endOfToday.setHours(23,59,59,999);
+      if(ms>endOfToday.getTime()) return "";
+    }
+  }
+  const load=(nl.load==null?"":String(nl.load)).trim();
+  const id=(nl.sosId==null?"":String(nl.sosId)).trim();
+  if(!load&&!id) return "";
+  const label="next"+(load?" #"+load:"");
+  if(!id) return '<span class="load-number next-load" title="Next load SOS link unavailable">'+esc(label)+'</span>';
+  const href="https://pro-intermodal.sostruckingsoftware.com/app/long-loads-edit?id="+encodeURIComponent(id);
+  return '<a class="load-number next-load" href="'+esc(href)+'" target="_blank" rel="noopener noreferrer" aria-label="Open SOS next load '+esc(load)+'">'+esc(label)+'<span aria-hidden="true" class="external-mark">↗</span></a>';
+}
+
+/* ===== tooltips ===== */
+function crewTooltipHtml(s){
+  const safeId = "c-"+String(s.id).replace(/[^a-zA-Z0-9_-]/g,"-");
+  const drv=s.drv||s.driver||"", co=s.co||"";
+  let body;
+  if(drv||co){
+    body='<span class="crew-role">Driver</span><strong>'+esc(drv||"Not listed")+'</strong>'+
+      (s.drvPhone?'<span>'+esc(s.drvPhone)+'</span>':"");
+    if(co){
+      body+='<span class="crew-divider"></span><span class="crew-role">Co-driver</span><strong>'+esc(co)+'</strong>'+
+        (s.coPhone?'<span>'+esc(s.coPhone)+'</span>':"");
+    }
+  }else{
+    body='<span>Driver information unavailable.</span>';
+  }
+  return '<span class="crew-anchor"><button type="button" class="truck-number" aria-describedby="'+safeId+'">'+esc(s.truck)+'</button>'+
+    '<span class="crew-tooltip" id="'+safeId+'" role="tooltip">'+body+'</span></span>';
+}
+function hosRiskFlag(s){
+  const v=s.hosRisk;
+  if(v===true||v===1) return true;
+  if(typeof v==="string"){ const t=v.trim().toLowerCase(); return t!==""&&t!=="false"&&t!=="0"; }
+  return false;
+}
+function etaTooltipHtml(s){
+  const safeId = "e-"+String(s.id).replace(/[^a-zA-Z0-9_-]/g,"-");
+  const e=s.eta?new Date(s.eta):null;
+  const validEta=e&&!isNaN(e.getTime());
+  const late=isLateStop(s);
+  const hos=(s.hos&&typeof s.hos==="object")?s.hos:null;
+  const hasHos=hos&&(hos.driveMin!=null||hos.shiftMin!=null||hos.cycleMin!=null);
+  let hosLine="";
+  if(hasHos){
+    hosLine="Drive "+fmtHos(hos.driveMin)+" · Shift "+fmtHos(hos.shiftMin)+" · Cycle "+fmtHos(hos.cycleMin);
+  }
+  if(hosRiskFlag(s)){
+    hosLine+=(hosLine?" · ":"")+'<span class="hos-risk-inline" title="The miles left don\'t fit the driver\'s legal hours.">HOS RISK</span>';
+  }
+  return '<span class="eta-anchor"><button type="button" class="eta-value" aria-describedby="'+safeId+'" aria-label="'+(late?"Late ":"")+'ETA for truck '+esc(s.truck)+'">'+
+    (validEta?esc(fmtEtaT.format(e)):"—")+'</button>'+
+    '<span class="eta-tooltip" id="'+safeId+'" role="tooltip"><strong>'+(validEta?(late?"Projected after appointment":"Projected on time"):"ETA unavailable")+'</strong>'+
+    '<span>'+(validEta?esc(fmtEtaD.format(e))+" · evaluated "+esc(fmtUpd.format(NOW_ETA))+" ET":"Awaiting current GPS and miles data.")+'</span>'+
+    (hosLine?'<small class="eta-hos">'+hosLine+'</small>':"")+'</span></span>';
+}
+
+/* ===== route icon ===== */
+function routeIconHtml(s){
+  const svg='<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.4" fill="currentColor" stroke="none"/>'+
+    '<circle cx="18" cy="6" r="2.4" fill="currentColor" stroke="none"/>'+
+    '<path d="M6 15.4V13c0-2.2 1.8-3.5 4-3.5h5c1.4 0 3-.7 3-2" stroke-dasharray="2.4 2"/></svg>';
+  const sr=(s.samsaraRoute&&typeof s.samsaraRoute==="object")?s.samsaraRoute:null;
+  const rawUrl=sr&&sr.url!=null?String(sr.url).trim():"";
+  if(rawUrl&&/^https?:\/\//i.test(rawUrl)){
+    return '<a class="route-btn" href="'+esc(rawUrl)+'" target="_blank" rel="noopener" title="View route in Samsara (opens in a new window)" aria-label="View route in Samsara">'+svg+'</a>';
+  }
+  /* fallback: Google Maps directions from the truck GPS to the stop */
+  const from=truckCoords(s), dest=stopCoords(s);
+  if(from&&dest){
+    const href="https://www.google.com/maps/dir/?api=1&travelmode=driving&origin="+from.lat+","+from.lng+"&destination="+dest.lat+","+dest.lng;
+    return '<a class="route-btn" href="'+esc(href)+'" target="_blank" rel="noopener" title="Open driving directions in Google Maps" aria-label="Open driving directions">'+svg+'</a>';
+  }
+  return "";
+}
+function routeProgressHtml(s){
+  const sr=(s.samsaraRoute&&typeof s.samsaraRoute==="object")?s.samsaraRoute:null;
+  const p=(sr&&sr.progress&&typeof sr.progress==="object")?sr.progress:null;
+  if(!p||p.total==null||p.total<=1) return "";
+  let cur=(p.current==null)?((p.done==null?0:p.done)+1):p.current;
+  cur=Math.max(1,Math.min(p.total,Math.round(cur)));
+  return '<span class="stop-progress" title="Route progress: stop '+cur+' of '+p.total+'">Stop '+cur+' of '+p.total+'</span>';
+}
+
+/* ===== notes ===== */
+function noteCellHtml(s){
+  const key=s.id, note=NOTES[key]||"";
+  if(EDITING===key){
+    return '<div class="note-cell" data-key="'+esc(key)+'"><form class="note-form" data-key="'+esc(key)+'">'+
+      '<textarea rows="2" aria-label="Note for truck '+esc(s.truck)+'" title="Shared with everyone viewing this page · notes can be edited but not deleted">'+esc(note)+'</textarea>'+
+      '<div class="note-actions"><button type="button" class="text-button" data-act="cancel">Cancel</button>'+
+      '<button type="submit" class="save-button">Save</button></div></form></div>';
+  }
+  return '<div class="note-cell"><button type="button" class="note-button" data-key="'+esc(key)+
+    '" aria-label="Edit note for truck '+esc(s.truck)+'">'+(note?esc(note):"Add note")+'</button></div>';
+}
+
+/* ===== row / sections ===== */
+function brokerRefLine(s){
+  const b=(s.broker||"").trim(), r=(s.ref||"").trim();
+  if(b&&r){
+    if(r.toLowerCase().includes(b.toLowerCase())||r===b) return r;
+    if(b.toLowerCase().includes(r.toLowerCase())) return b;
+    return b+" / "+r;
+  }
+  return b||r||"No broker / reference";
+}
+function truckTypeWord(s){ return s.t==="P"?"pickup":"delivery"; }
+function typeLabel(s){ return s.t==="P"?"PICK UP":"DELIVERY"; }
+
+function rowHtml(s, nowMs){
+  const late = isLateStop(s);
+  const gpsInfo = gpsAtStopInfo(s, nowMs);
+  const timeMs = new Date(s.appt).getTime();
+  let rel, past=false;
+  if(isNaN(timeMs)){ rel="time to be confirmed"; }
+  else if(timeMs<nowMs){ rel="past due"; past=true; } else { rel="in "+fmtDur((timeMs-nowMs)/60000); }
+  const loadNum = "#"+s.load;
+  const sosId = (s.sosId==null?"":String(s.sosId)).trim();
+  const loadHtml = sosId
+    ? '<a class="load-number" href="https://pro-intermodal.sostruckingsoftware.com/app/long-loads-edit?id='+esc(encodeURIComponent(sosId))+'" target="_blank" rel="noopener noreferrer" aria-label="Open SOS load '+esc(s.load)+'">'+esc(loadNum)+'<span aria-hidden="true" class="external-mark">↗</span></a>'
+    : '<span class="load-number" title="SOS link unavailable">'+esc(loadNum)+'</span>';
+  const trailer = (s.trailer||"").trim();
+  return '<article class="stop-row '+urgencyClass(s.appt,nowMs)+(gpsInfo.atStop?" gps-at-stop":"")+'">'+
+    '<div class="truck-cell"><span class="truck-id">'+crewTooltipHtml(s)+
+      (trailer?'<span class="trailer-tag">'+esc(trailer)+'</span>':"")+
+      gpsMarkHtml(s,nowMs)+'</span><span class="type-mark '+truckTypeWord(s)+'">'+typeLabel(s)+'</span></div>'+
+    '<div class="load-cell">'+loadHtml+nextLoadHtml(s)+'<span>'+esc(brokerRefLine(s))+'</span></div>'+
+    '<div class="st-cell"><span class="mobile-label">ST&nbsp;</span><span class="st-code">'+esc(s.st||"—")+'</span></div>'+
+    '<div class="appointment-cell"><span class="mobile-label">Appointment</span><strong>'+esc(fmtAppt(new Date(s.appt)))+'</strong></div>'+
+    '<div class="time-cell'+(late?" late":"")+'"><span class="mobile-label">Time to appt</span><span class="time-rel'+(past?" past":"")+'">'+rel+'</span>'+
+      '<span class="eta-label">ETA '+etaTooltipHtml(s)+'</span></div>'+
+    '<div class="miles-cell"><span class="mobile-label">Miles</span><span class="miles-wrap"><strong>'+(s.miles==null?"—":esc(fmtNum(s.miles)))+'</strong>'+
+      routeIconHtml(s)+routeProgressHtml(s)+'</span></div>'+
+    '<div class="place-cell"><span>'+esc(s.addr||s.parada||"Address unavailable")+'</span>'+arrivalPillHtml(s)+gpsAtStopPillHtml(s,nowMs)+'</div>'+
+    noteCellHtml(s)+
+  '</article>';
+}
+function headHtml(){
+  return '<div class="desktop-head" aria-hidden="true"><span>Truck</span><span>Load #</span>'+
+    '<span>ST</span><span>Appt</span><span>Time to appt</span><span>Miles</span><span>Parada</span><span>Notes</span></div>';
+}
+function dateGroupsHtml(rows, nowMs){
+  rows=rows.slice().sort((a,b)=>new Date(a.appt)-new Date(b.appt));
+  const map=new Map();
+  rows.forEach(s=>{
+    const d0=new Date(s.appt);
+    const key=isNaN(d0.getTime())?"undated":fmtCA.format(d0);
+    if(!map.has(key)) map.set(key,[]);
+    map.get(key).push(s);
+  });
+  return [...map.keys()].sort().map(k=>{
+    const list=map.get(k);
+    const d0=new Date(list[0].appt);
+    const head=isNaN(d0.getTime())?"Date to be confirmed":fmtDay.format(d0);
+    return '<section class="date-group"><h2>'+esc(head)+'<span>'+list.length+'</span></h2>'+
+      '<div class="rows">'+list.map(s=>rowHtml(s,nowMs)).join("")+'</div></section>';
+  }).join("");
+}
+function typeSectionHtml(kind, rows, nowMs){
+  const isP=kind==="P";
+  const label=isP?"PICK UPS":"DELIVERY", cls=isP?"pickup":"delivery";
+  const word=isP?"pick ups":"deliveries";
+  const emptyNote=rows.length?"":'<div class="section-empty">No '+word+' match the current filters.</div>';
+  return '<section class="type-section" aria-label="'+(isP?"Pick ups":"Deliveries")+'">'+
+    '<h2 class="section-head '+cls+'">'+label+'<span class="section-count">'+rows.length+'</span></h2>'+
+    headHtml()+emptyNote+(rows.length?dateGroupsHtml(rows,nowMs):"")+'</section>';
+}
+
+/* ===== dispatcher filter ===== */
+let DP_SIG="";
+function dispatcherList(){
+  const seen=new Map();
+  STOPS.forEach(s=>{
+    const d=String(s.dispatcher==null?"":s.dispatcher).trim();
+    if(d&&!seen.has(d.toLowerCase())) seen.set(d.toLowerCase(),d);
+  });
+  return [...seen.values()].sort((a,b)=>a.localeCompare(b));
+}
+function syncDispatcherUI(){
+  const sel=$("dispatcher"); if(!sel) return;
+  const list=dispatcherList();
+  if(list.length===0){ sel.hidden=true; DP_SIG=""; state.dispatcher="all"; return; }
+  const match=list.find(d=>d.toLowerCase()===state.dispatcher.toLowerCase());
+  state.dispatcher=match?match:"all";
+  sel.hidden=false;
+  const sig=list.length+""+list.join("");
+  if(sig!==DP_SIG){
+    DP_SIG=sig;
+    sel.innerHTML='<option value="all">Dispatcher: All</option>'+
+      list.map(d=>'<option value="'+esc(d)+'">'+esc(d)+'</option>').join("");
+  }
+  const dcounts=new Map();
+  STOPS.forEach(s=>{
+    const d=String(s.dispatcher==null?"":s.dispatcher).trim().toLowerCase();
+    if(d) dcounts.set(d,(dcounts.get(d)||0)+1);
+  });
+  for(const opt of sel.options){
+    if(opt.value==="all") opt.textContent="Dispatcher: All ("+STOPS.length+")";
+    else opt.textContent=opt.value+" ("+(dcounts.get(opt.value.toLowerCase())||0)+")";
+  }
+  if(sel.value!==state.dispatcher) sel.value=state.dispatcher;
+}
+
+/* ===== render ===== */
+function render(){
+  let keepText=null;
+  if(EDITING!=null){
+    const ta=document.querySelector(".note-form[data-key] textarea");
+    if(ta) keepText=ta.value;
+  }
+  const nowMs=Date.now();
+  const allSorted=STOPS.slice().sort((a,b)=>new Date(a.appt)-new Date(b.appt));
+  const rows=filtered();
+
+  const pick=allSorted.filter(s=>s.t==="P").length;
+  $("c-stops").textContent=allSorted.length;
+  $("c-pick").textContent=pick;
+  $("c-del").textContent=allSorted.length-pick;
+  $("c-late").textContent=allSorted.filter(isLateStop).length;
+  const lt=$("late-toggle");
+  lt.classList.toggle("active", state.lateOnly);
+  lt.setAttribute("aria-pressed", state.lateOnly?"true":"false");
+  const gpsAtStopCount=allSorted.filter(s=>isGpsAtStop(s, nowMs)).length;
+  $("c-gps-at-stop").textContent=gpsAtStopCount;
+  const gt=$("gps-toggle");
+  gt.classList.toggle("active", state.gpsAtStopOnly);
+  gt.setAttribute("aria-pressed", state.gpsAtStopOnly?"true":"false");
+  document.querySelectorAll(".type-filter-btn").forEach(b=>
+    b.setAttribute("aria-pressed", b.getAttribute("data-type")===state.type?"true":"false"));
+  syncDispatcherUI();
+
+  const groupsEl=$("groups");
+  const pickups=rows.filter(s=>s.t==="P");
+  const deliveries=rows.filter(s=>s.t!=="P");
+  const noResults=rows.length ? "" :
+    '<div class="no-results"><strong>No matches.</strong><span>Try another truck, load, or filter.</span>'+
+    '<button data-act="clear">Clear filters</button></div>';
+  let sections="";
+  if(state.type!=="D") sections+=typeSectionHtml("P",pickups,nowMs);
+  if(state.type!=="P") sections+=typeSectionHtml("D",deliveries,nowMs);
+  groupsEl.innerHTML=noResults+sections;
+
+  if(EDITING!=null){
+    const ta=document.querySelector('.note-form[data-key="'+EDITING.split('"').join('\\"')+'"] textarea');
+    if(ta){
+      if(keepText!=null) ta.value=keepText;
+      ta.focus(); ta.setSelectionRange(ta.value.length,ta.value.length);
+    }else{
+      EDITING=null;
+    }
+  }
+
+  const fn=$("feed-note");
+  if(fn) fn.hidden = DATA_LOADED;
+  $("loading").hidden=true;
+  $("board").hidden=false;
+}
+
+/* ===== controls ===== */
+$("q").addEventListener("input",e=>{ state.q=e.target.value; render(); });
+$("late-toggle").addEventListener("click",()=>{ state.lateOnly=!state.lateOnly; render(); });
+$("gps-toggle").addEventListener("click",()=>{ state.gpsAtStopOnly=!state.gpsAtStopOnly; render(); });
+document.querySelectorAll(".type-filter-btn").forEach(b=>
+  b.addEventListener("click",()=>{ state.type=b.getAttribute("data-type"); render(); }));
+$("dispatcher").addEventListener("change",e=>{ state.dispatcher=e.target.value; render(); });
+
+$("board").addEventListener("click",e=>{
+  const clear=e.target.closest('[data-act="clear"]');
+  if(clear){ state.q=""; state.lateOnly=false; state.gpsAtStopOnly=false; state.type="all"; state.dispatcher="all"; $("q").value=""; render(); return; }
+
+  const nb=e.target.closest(".note-button");
+  if(nb){ EDITING=nb.getAttribute("data-key"); render(); return; }
+
+  const cancel=e.target.closest('[data-act="cancel"]');
+  if(cancel){ EDITING=null; render(); return; }
+
+  const tn=e.target.closest(".truck-number");
+  if(tn){ tn.closest(".crew-anchor").classList.toggle("force"); return; }
+  const ev=e.target.closest(".eta-value");
+  if(ev){ ev.closest(".eta-anchor").classList.toggle("force"); return; }
+});
+$("board").addEventListener("submit",e=>{
+  const form=e.target.closest(".note-form"); if(!form) return;
+  e.preventDefault();
+  const key=form.getAttribute("data-key");
+  const txt=form.querySelector("textarea").value.trim();
+  if(!txt && NOTES[key]){
+    /* notes can be edited, never deleted: empty saves are ignored */
+    EDITING=null; render(); return;
+  }
+  if(txt) saveNote(key, txt);
+  EDITING=null; render();
+});
+document.addEventListener("pointerdown",e=>{
+  if(!e.target.closest(".crew-anchor")) document.querySelectorAll(".crew-anchor.force").forEach(a=>a.classList.remove("force"));
+  if(!e.target.closest(".eta-anchor")) document.querySelectorAll(".eta-anchor.force").forEach(a=>a.classList.remove("force"));
+});
+
+setInterval(()=>{ if(DATA_LOADED) render(); }, 30000);
+
+initFirebase();
+</script>
+</body>
+</html>
