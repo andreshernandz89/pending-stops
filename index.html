@@ -774,7 +774,7 @@ function rowHtml(s, nowMs){
       '<span class="eta-label">ETA '+etaTooltipHtml(s)+'</span></div>'+
     '<div class="miles-cell"><span class="mobile-label">Miles</span><span class="miles-wrap"><strong>'+(s.miles==null?"—":esc(fmtNum(s.miles)))+'</strong>'+
       routeIconHtml(s)+routeProgressHtml(s)+'</span></div>'+
-    '<div class="place-cell"><span>'+esc(s.addr||s.parada||"Address unavailable")+'</span>'+arrivalPillHtml(s)+gpsAtStopPillHtml(s,nowMs)+'</div>'+
+    '<div class="place-cell"><span>'+esc(s.parada||s.addr||"Address unavailable")+'</span>'+arrivalPillHtml(s)+gpsAtStopPillHtml(s,nowMs)+'</div>'+
     noteCellHtml(s)+
   '</article>';
 }
