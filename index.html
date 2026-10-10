@@ -780,7 +780,7 @@ function rowHtml(s, nowMs){
 }
 function headHtml(){
   return '<div class="desktop-head" aria-hidden="true"><span>Truck</span><span>Load #</span>'+
-    '<span>ST</span><span>Appt</span><span>Time to appt</span><span>Miles</span><span>Parada</span><span>Notes</span></div>';
+    '<span>ST</span><span>Appt</span><span>Time to appt</span><span>Miles</span><span>Next stop</span><span>Notes</span></div>';
 }
 function dateGroupsHtml(rows, nowMs){
   rows=rows.slice().sort((a,b)=>new Date(a.appt)-new Date(b.appt));
