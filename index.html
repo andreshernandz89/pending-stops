@@ -176,6 +176,10 @@ a.next-load { font-size: 12px; font-weight: 700; }
 
 .note-cell { grid-area: note; min-width: 0; display: flex; justify-content: flex-end; }
 .note-button { max-width: 190px; padding: 3px 0; overflow: hidden; border: 0; color: var(--dim); background: transparent; text-align: right; text-decoration: underline dotted; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; cursor: pointer; }
+.stopdone-btn { display: inline-block; margin-top: 2px; padding: 2px 10px; border: 1px solid rgba(46,125,50,.55); border-radius: 20px; background: transparent; color: var(--green); font-size: 11px; font-weight: 600; cursor: pointer; }
+.stopdone-btn:hover { background: rgba(46,125,50,.12); }
+.stopdone-btn.checking { border-color: var(--dim); color: var(--dim); cursor: default; }
+.stopdone-btn.checking:hover { background: transparent; }
 .note-button:not(:hover) { text-decoration-color: var(--border); }
 .note-form { width: 100%; }
 .note-form textarea { width: 100%; padding: 8px; resize: vertical; border: 1px solid var(--border); border-radius: 5px; outline: none; color: var(--text); background: var(--bg); font-size: 12px; }
@@ -364,6 +368,8 @@ function fmtHos(mins){
 /* ===== shared notes (Firebase Realtime Database) ===== */
 const NOTES = {};
 const notesRefHolder = { ref: null, online: false };
+const VERIFY = {};
+const verifyRefHolder = { ref: null };
 let EDITING = null;
 
 function paintNotesChip(){
@@ -400,6 +406,30 @@ function initNotes(db){
     Object.keys(NOTES).forEach(k=>{ if(!(k in v)) delete NOTES[k]; });
     if(DATA_LOADED) render();
   }, err=>{ console.error("notes read",err); });
+}
+function initVerify(db){
+  const ref=db.ref("verifyQueue");
+  verifyRefHolder.ref=ref;
+  ref.on("value", snap=>{
+    const v=snap.val()||{};
+    Object.keys(v).forEach(k=>{ VERIFY[k]=v[k]&&v[k].ts?v[k].ts:Date.now(); });
+    Object.keys(VERIFY).forEach(k=>{ if(!(k in v)) delete VERIFY[k]; });
+    if(DATA_LOADED) render();
+  }, err=>{ console.error("verify read",err); });
+}
+function requestVerify(truck, load, sosId){
+  const ref=verifyRefHolder.ref;
+  if(!ref) return;
+  const t=String(truck);
+  VERIFY[t]=Date.now();
+  render();
+  ref.child(t).set({ts: Date.now(), load: load||"", sosId: sosId==null?"":String(sosId)})
+    .catch(err=>{ console.error("verify write",err); delete VERIFY[t]; render(); });
+}
+function verifyBtnHtml(s){
+  const t=String(s.truck);
+  if(VERIFY[t]) return '<button class="stopdone-btn checking" disabled>Checking&hellip;</button>';
+  return '<button class="stopdone-btn" data-verify="'+esc(t)+'" data-load="'+esc(s.load||"")+'" data-sosid="'+esc(s.sosId==null?"":String(s.sosId))+'">Stop Done</button>';
 }
 
 /* ===== meta chips ===== */
@@ -484,6 +514,7 @@ function initFirebase(){
     });
     initStops(db);
     initNotes(db);
+    initVerify(db);
     initMeta(db);
   }catch(e){
     console.error("firebase init", e);
@@ -774,7 +805,7 @@ function rowHtml(s, nowMs){
       '<span class="eta-label">ETA '+etaTooltipHtml(s)+'</span></div>'+
     '<div class="miles-cell"><span class="mobile-label">Miles</span><span class="miles-wrap"><strong>'+(s.miles==null?"—":esc(fmtNum(s.miles)))+'</strong>'+
       routeIconHtml(s)+routeProgressHtml(s)+'</span></div>'+
-    '<div class="place-cell"><span>'+esc(s.parada||s.addr||"Address unavailable")+'</span>'+arrivalPillHtml(s)+gpsAtStopPillHtml(s,nowMs)+'</div>'+
+    '<div class="place-cell"><span>'+esc(s.parada||s.addr||"Address unavailable")+'</span>'+arrivalPillHtml(s)+gpsAtStopPillHtml(s,nowMs)+verifyBtnHtml(s)+'</div>'+
     noteCellHtml(s)+
   '</article>';
 }
@@ -913,6 +944,9 @@ $("board").addEventListener("click",e=>{
 
   const nb=e.target.closest(".note-button");
   if(nb){ EDITING=nb.getAttribute("data-key"); render(); return; }
+
+  const vb=e.target.closest("[data-verify]");
+  if(vb){ requestVerify(vb.getAttribute("data-verify"), vb.getAttribute("data-load"), vb.getAttribute("data-sosid")); return; }
 
   const cancel=e.target.closest('[data-act="cancel"]');
   if(cancel){ EDITING=null; render(); return; }
