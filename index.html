@@ -429,7 +429,7 @@ function requestVerify(truck, load, sosId){
 function verifyBtnHtml(s){
   const t=String(s.truck);
   if(VERIFY[t]) return '<button class="stopdone-btn checking" disabled>Checking&hellip;</button>';
-  return '<button class="stopdone-btn" data-verify="'+esc(t)+'" data-load="'+esc(s.load||"")+'" data-sosid="'+esc(s.sosId==null?"":String(s.sosId))+'">Stop Done</button>';
+  return '<button class="stopdone-btn" data-verify="'+esc(t)+'" data-load="'+esc(s.load||"")+'" data-sosid="'+esc(s.sosId==null?"":String(s.sosId))+'">Update Stop</button>';
 }
 
 /* ===== meta chips ===== */
