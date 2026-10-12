@@ -77,6 +77,8 @@ main { width: min(1500px, 100%); margin: 0 auto; padding: 12px; }
 .late-toggle.active { color: white; border-color: var(--danger); background: var(--danger); }
 .gps-toggle { padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; color: var(--amber); background: transparent; font-size: 12px; font-weight: 700; cursor: pointer; }
 .gps-toggle.active { color: white; border-color: var(--amber); background: var(--amber); }
+.pod-toggle { padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; color: var(--blue); background: transparent; font-size: 12px; font-weight: 700; cursor: pointer; }
+.pod-toggle.active { color: white; border-color: var(--blue); background: var(--blue); }
 .filter-row { margin-top: 12px; display: flex; flex-direction: column; gap: 9px; }
 .search-box { min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-strong); }
 .search-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(15,122,79,.18); }
@@ -262,6 +264,7 @@ a.next-load { font-size: 12px; font-weight: 700; }
           <span><i class="delivery-line"></i><span id="c-del">0</span> deliveries</span>
           <button class="late-toggle" id="late-toggle" aria-pressed="false"><span id="c-late">0</span> late ETA</button>
           <button class="gps-toggle" id="gps-toggle" aria-pressed="false" title="Trucks whose GPS is already at the stop but SOS arrival is not signed yet"><span id="c-gps-at-stop">0</span> at stop · SOS pending</button>
+          <button class="pod-toggle" id="pod-toggle" aria-pressed="false" title="Loads where the truck is ON SITE at the last stop (delivery)"><span id="c-pod">0</span> pending POD</button>
         </div>
         <div class="filter-row">
           <label class="search-box">
@@ -532,7 +535,7 @@ function saveNote(key, text){
 }
 
 /* ===== board ===== */
-const state={ q:"", lateOnly:false, gpsAtStopOnly:false, type:"all", dispatcher:"all" };
+const state={ q:"", lateOnly:false, gpsAtStopOnly:false, podOnly:false, type:"all", dispatcher:"all" };
 
 function isLateStop(s){ return s.isLate===true || s.isLate===1; }
 function filtered(){
@@ -541,6 +544,7 @@ function filtered(){
   return STOPS.filter(s=>{
     if(state.lateOnly && !isLateStop(s)) return false;
     if(state.gpsAtStopOnly && !isGpsAtStop(s, nowMs)) return false;
+    if(state.podOnly && !isPendingPod(s)) return false;
     if(state.type!=="all" && s.t!==state.type) return false;
     if(state.dispatcher!=="all"){
       const d=String(s.dispatcher==null?"":s.dispatcher).trim();
@@ -619,6 +623,10 @@ function arrivalState(s){
   const departed=has(s.departedTs);
   if(!arrived&&!departed) return null;
   return (arrived&&!departed)?"onsite":"enroute";
+}
+function isPendingPod(s){
+  const t=(s.type||"").toUpperCase();
+  return t.indexOf("DELIV")===0 && arrivalState(s)==="onsite";
 }
 function arrivalPillHtml(s){
   const st=arrivalState(s);
@@ -899,6 +907,11 @@ function render(){
   const gt=$("gps-toggle");
   gt.classList.toggle("active", state.gpsAtStopOnly);
   gt.setAttribute("aria-pressed", state.gpsAtStopOnly?"true":"false");
+  const podCount=allSorted.filter(isPendingPod).length;
+  $("c-pod").textContent=podCount;
+  const pt=$("pod-toggle");
+  pt.classList.toggle("active", state.podOnly);
+  pt.setAttribute("aria-pressed", state.podOnly?"true":"false");
   document.querySelectorAll(".type-filter-btn").forEach(b=>
     b.setAttribute("aria-pressed", b.getAttribute("data-type")===state.type?"true":"false"));
   syncDispatcherUI();
@@ -934,13 +947,14 @@ function render(){
 $("q").addEventListener("input",e=>{ state.q=e.target.value; render(); });
 $("late-toggle").addEventListener("click",()=>{ state.lateOnly=!state.lateOnly; render(); });
 $("gps-toggle").addEventListener("click",()=>{ state.gpsAtStopOnly=!state.gpsAtStopOnly; render(); });
+$("pod-toggle").addEventListener("click",()=>{ state.podOnly=!state.podOnly; render(); });
 document.querySelectorAll(".type-filter-btn").forEach(b=>
   b.addEventListener("click",()=>{ state.type=b.getAttribute("data-type"); render(); }));
 $("dispatcher").addEventListener("change",e=>{ state.dispatcher=e.target.value; render(); });
 
 $("board").addEventListener("click",e=>{
   const clear=e.target.closest('[data-act="clear"]');
-  if(clear){ state.q=""; state.lateOnly=false; state.gpsAtStopOnly=false; state.type="all"; state.dispatcher="all"; $("q").value=""; render(); return; }
+  if(clear){ state.q=""; state.lateOnly=false; state.gpsAtStopOnly=false; state.podOnly=false; state.type="all"; state.dispatcher="all"; $("q").value=""; render(); return; }
 
   const nb=e.target.closest(".note-button");
   if(nb){ EDITING=nb.getAttribute("data-key"); render(); return; }
