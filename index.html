@@ -625,8 +625,11 @@ function arrivalState(s){
   return (arrived&&!departed)?"onsite":"enroute";
 }
 function isPendingPod(s){
+  if(arrivalState(s)!=="onsite") return false;
+  if(s.isLastStop===true) return true;
+  if(s.isLastStop===false) return false;
   const t=(s.type||"").toUpperCase();
-  return t.indexOf("DELIV")===0 && arrivalState(s)==="onsite";
+  return t.indexOf("DELIV")===0;
 }
 function arrivalPillHtml(s){
   const st=arrivalState(s);
@@ -768,7 +771,7 @@ function noteCellHtml(s){
   const key=s.id, note=NOTES[key]||"";
   if(EDITING===key){
     return '<div class="note-cell" data-key="'+esc(key)+'"><form class="note-form" data-key="'+esc(key)+'">'+
-      '<textarea rows="2" aria-label="Note for truck '+esc(s.truck)+'" title="Shared with everyone viewing this page · notes can be edited but not deleted">'+esc(note)+'</textarea>'+
+      '<textarea rows="2" aria-label="Note for truck '+esc(s.truck)+'" title="Shared with everyone viewing this page · notes can be edited but not deleted · Enter to save">'+esc(note)+'</textarea>'+
       '<div class="note-actions"><button type="button" class="text-button" data-act="cancel">Cancel</button>'+
       '<button type="submit" class="save-button">Save</button></div></form></div>';
   }
@@ -981,6 +984,12 @@ $("board").addEventListener("submit",e=>{
   }
   if(txt) saveNote(key, txt);
   EDITING=null; render();
+});
+$("board").addEventListener("keydown",e=>{
+  if(e.key!=="Enter"||e.shiftKey) return;
+  const ta=e.target.closest(".note-form textarea"); if(!ta) return;
+  e.preventDefault();
+  ta.closest(".note-form").requestSubmit();
 });
 document.addEventListener("pointerdown",e=>{
   if(!e.target.closest(".crew-anchor")) document.querySelectorAll(".crew-anchor.force").forEach(a=>a.classList.remove("force"));
