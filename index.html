@@ -812,8 +812,8 @@ function rowHtml(s, nowMs){
     '<div class="load-cell">'+loadHtml+nextLoadHtml(s)+'<span>'+esc(brokerRefLine(s))+'</span></div>'+
     '<div class="st-cell"><span class="mobile-label">ST&nbsp;</span><span class="st-code">'+esc(s.st||"—")+'</span></div>'+
     '<div class="appointment-cell"><span class="mobile-label">Appointment</span><strong>'+esc(fmtAppt(new Date(s.appt)))+'</strong></div>'+
-    '<div class="time-cell'+(late?" late":"")+'"><span class="mobile-label">Time to appt</span><span class="time-rel'+(past?" past":"")+'">'+rel+'</span>'+
-      '<span class="eta-label">ETA '+etaTooltipHtml(s)+'</span></div>'+
+    '<div class="time-cell'+(late?" late":"")+'">'+(arrivalState(s)==="onsite"?"":'<span class="mobile-label">Time to appt</span><span class="time-rel'+(past?" past":"")+'">'+rel+'</span>'+
+      '<span class="eta-label">ETA '+etaTooltipHtml(s)+'</span>')+'</div>'+
     '<div class="miles-cell"><span class="mobile-label">Miles</span><span class="miles-wrap"><strong>'+(s.miles==null?"—":esc(fmtNum(s.miles)))+'</strong>'+
       routeIconHtml(s)+routeProgressHtml(s)+'</span></div>'+
     '<div class="place-cell"><span>'+esc(s.parada||s.addr||"Address unavailable")+'</span>'+arrivalPillHtml(s)+gpsAtStopPillHtml(s,nowMs)+verifyBtnHtml(s)+'</div>'+
