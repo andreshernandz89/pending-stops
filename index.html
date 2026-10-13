@@ -63,6 +63,7 @@ main { width: min(1500px, 100%); margin: 0 auto; padding: 12px; }
 .type-mark.delivery { background: var(--accent); }
 .arrival-pill { flex: 0 0 auto; align-self: center; display: inline-flex; align-items: center; min-height: 20px; padding: 2px 9px; border-radius: 999px; color: #fff; font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 10px; font-weight: 800; letter-spacing: .07em; white-space: nowrap; }
 .arrival-pill.onsite { background: var(--accent); }
+.prev-dlvry-pill { flex: 0 0 auto; align-self: center; display: inline-flex; align-items: center; min-height: 20px; padding: 2px 9px; border-radius: 999px; color: #4a2f00; background: #ffc95e; font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 10px; font-weight: 800; letter-spacing: .07em; white-space: nowrap; }
 .arrival-pill.enroute { background: #64727d; }
 .arrival-pill.gps { background: var(--amber); }
 .stop-row.gps-at-stop { border-left-color: var(--amber); }
@@ -817,7 +818,7 @@ function rowHtml(s, nowMs){
       '<span class="eta-label">ETA '+etaTooltipHtml(s)+'</span>')+'</div>'+
     '<div class="miles-cell"><span class="mobile-label">Miles</span><span class="miles-wrap"><strong>'+(s.miles==null?"—":esc(fmtNum(s.miles)))+'</strong>'+
       routeIconHtml(s)+routeProgressHtml(s)+((s.stopIndex&&s.stopCount)?'<span class="stop-count">Stop '+s.stopIndex+'/'+s.stopCount+'</span>':"")+'</span></div>'+
-    '<div class="place-cell"><span>'+esc(s.parada||s.addr||"Address unavailable")+'</span>'+arrivalPillHtml(s)+gpsAtStopPillHtml(s,nowMs)+verifyBtnHtml(s)+'</div>'+
+    '<div class="place-cell"><span>'+esc(s.parada||s.addr||"Address unavailable")+'</span>'+(s.prevDlvry?'<span class="prev-dlvry-pill">ON PREVIOUS DLVRY</span>':arrivalPillHtml(s)+gpsAtStopPillHtml(s,nowMs)+verifyBtnHtml(s))+'</div>'+
     noteCellHtml(s)+
   '</article>';
 }
@@ -921,8 +922,27 @@ function render(){
   syncDispatcherUI();
 
   const groupsEl=$("groups");
-  const pickups=rows.filter(s=>s.t==="P");
   const deliveries=rows.filter(s=>s.t!=="P");
+  const pickups=rows.filter(s=>s.t==="P");
+  if(state.type!=="D"){
+    const endToday=new Date(); endToday.setHours(23,59,59,999);
+    deliveries.forEach(s=>{
+      const nl=(s.nextLoad&&typeof s.nextLoad==="object")?s.nextLoad:null;
+      if(!nl||!nl.load) return;
+      if(nl.appt){ const ms=new Date(nl.appt).getTime(); if(!isNaN(ms)&&ms>endToday.getTime()) return; }
+      pickups.push(Object.assign({}, s, {
+        t:"P", type:"PICK UP", load:String(nl.load), sosId:(nl.sosId==null?"":nl.sosId),
+        appt:nl.appt||null, parada:nl.parada||"", addr:nl.parada||"",
+        st:nl.st||"", broker:nl.broker||"", ref:nl.ref||"",
+        miles:null, eta:null, isLate:false, hos:null, hosRisk:false,
+        arrivedTs:null, departedTs:null, signedBy:"",
+        stopIndex:nl.stopIndex||null, stopCount:nl.stopCount||null,
+        isLastStop:false, nextLoad:null,
+        stopLat:null, stopLng:null, gpsAtStop:false, samsaraRoute:null,
+        id:"p:"+nl.load+":"+s.truck, prevDlvry:true
+      }));
+    });
+  }
   const noResults=rows.length ? "" :
     '<div class="no-results"><strong>No matches.</strong><span>Try another truck, load, or filter.</span>'+
     '<button data-act="clear">Clear filters</button></div>';
