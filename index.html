@@ -140,6 +140,8 @@ a.gps-mark.on:focus-visible { outline: 2px solid var(--accent); outline-offset: 
 a.load-number { color: var(--accent); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
 a.load-number:hover, a.load-number:focus-visible { color: var(--navy); }
 a.next-load { font-size: 12px; font-weight: 700; }
+.load-line { display: inline-flex; align-items: baseline; gap: 7px; flex-wrap: wrap; }
+.load-route { font-size: 11px; font-weight: 700; letter-spacing: .5px; color: var(--dim); white-space: nowrap; }
 .external-mark { margin-left: 3px; font-family: system-ui, sans-serif; font-size: 11px; }
 
 .st-cell { grid-area: st; display: flex; align-items: center; }
@@ -691,9 +693,10 @@ function nextLoadHtml(s){
   const id=(nl.sosId==null?"":String(nl.sosId)).trim();
   if(!load&&!id) return "";
   const label="next"+(load?" #"+load:"");
-  if(!id) return '<span class="load-number next-load" title="Next load SOS link unavailable">'+esc(label)+'</span>';
+  const rtHtml = (nl.route||"").trim() ? '<span class="load-route">'+esc(nl.route)+'</span>' : '';
+  if(!id) return '<span class="load-line"><span class="load-number next-load" title="Next load SOS link unavailable">'+esc(label)+'</span>'+rtHtml+'</span>';
   const href="https://pro-intermodal.sostruckingsoftware.com/app/long-loads-edit?id="+encodeURIComponent(id);
-  return '<a class="load-number next-load" href="'+esc(href)+'" target="_blank" rel="noopener noreferrer" aria-label="Open SOS next load '+esc(load)+'">'+esc(label)+'<span aria-hidden="true" class="external-mark">↗</span></a>';
+  return '<span class="load-line"><a class="load-number next-load" href="'+esc(href)+'" target="_blank" rel="noopener noreferrer" aria-label="Open SOS next load '+esc(load)+'">'+esc(label)+'<span aria-hidden="true" class="external-mark">↗</span></a>'+rtHtml+'</span>';
 }
 
 /* ===== tooltips ===== */
@@ -806,12 +809,13 @@ function rowHtml(s, nowMs){
   const loadHtml = sosId
     ? '<a class="load-number" href="https://pro-intermodal.sostruckingsoftware.com/app/long-loads-edit?id='+esc(encodeURIComponent(sosId))+'" target="_blank" rel="noopener noreferrer" aria-label="Open SOS load '+esc(s.load)+'">'+esc(loadNum)+'<span aria-hidden="true" class="external-mark">↗</span></a>'
     : '<span class="load-number" title="SOS link unavailable">'+esc(loadNum)+'</span>';
+  const routeHtml = s.route ? '<span class="load-route">'+esc(s.route)+'</span>' : '';
   const trailer = (s.trailer||"").trim();
   return '<article class="stop-row '+urgencyClass(s.appt,nowMs)+(gpsInfo.atStop?" gps-at-stop":"")+'">'+
     '<div class="truck-cell"><span class="truck-id"><span class="truck-line">'+crewTooltipHtml(s)+
       (trailer?'<span class="trailer-tag">'+esc(trailer)+'</span>':"")+'</span>'+
       gpsMarkHtml(s,nowMs)+'</span><span class="type-mark '+truckTypeWord(s)+'">'+typeLabel(s)+'</span></div>'+
-    '<div class="load-cell">'+loadHtml+nextLoadHtml(s)+'<span>'+esc(brokerRefLine(s))+'</span></div>'+
+    '<div class="load-cell"><span class="load-line">'+loadHtml+routeHtml+'</span>'+nextLoadHtml(s)+'<span>'+esc(brokerRefLine(s))+'</span></div>'+
     '<div class="st-cell"><span class="mobile-label">ST&nbsp;</span><span class="st-code">'+esc(s.st||"—")+'</span></div>'+
     '<div class="appointment-cell"><span class="mobile-label">Appointment</span><strong>'+esc(fmtAppt(new Date(s.appt)))+'</strong></div>'+
     '<div class="time-cell'+(late?" late":"")+'">'+(arrivalState(s)==="onsite"?"":'<span class="mobile-label">Time to appt</span><span class="time-rel'+(past?" past":"")+'">'+rel+'</span>'+
@@ -933,7 +937,7 @@ function render(){
       pickups.push(Object.assign({}, s, {
         t:"P", type:"PICK UP", load:String(nl.load), sosId:(nl.sosId==null?"":nl.sosId),
         appt:nl.appt||null, parada:nl.parada||"", addr:nl.parada||"",
-        st:nl.st||"", broker:nl.broker||"", ref:nl.ref||"",
+        st:nl.st||"", broker:nl.broker||"", ref:nl.ref||"", route:(nl.route||""),
         miles:(nl.miles!=null?nl.miles:null), eta:null, isLate:false, hos:null, hosRisk:false,
         arrivedTs:null, departedTs:null, signedBy:"",
         stopIndex:nl.stopIndex||null, stopCount:nl.stopCount||null,
