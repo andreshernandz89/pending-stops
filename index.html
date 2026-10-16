@@ -714,7 +714,7 @@ function nextLoadHtml(s){
 /* ===== tooltips ===== */
 function crewTooltipHtml(s){
   const safeId = "c-"+String(s.id).replace(/[^a-zA-Z0-9_-]/g,"-");
-  const drv=s.drv||s.driver||"", co=s.co||"";
+  const drv=s.driver||s.drv||"", co=s.co||"";
   let body;
   if(drv||co){
     body='<span class="crew-role">Driver</span><strong>'+esc(drv||"Not listed")+'</strong>'+
