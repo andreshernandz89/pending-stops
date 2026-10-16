@@ -91,8 +91,16 @@ main { width: min(1500px, 100%); margin: 0 auto; padding: 12px; }
 .type-filter-btn:first-child { border-left: 0; }
 .type-filter-btn[aria-pressed="true"] { color: #fff; background: var(--navy); }
 .type-filter-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-.dispatch-select { flex: 0 0 auto; min-height: 44px; max-width: 100%; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-strong); color: var(--text); font-size: 12.5px; font-weight: 750; cursor: pointer; }
-.dispatch-select:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.dispatch-filter { position: relative; flex: 0 0 auto; }
+.dispatch-btn { min-height: 44px; max-width: 100%; padding: 0 12px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-strong); color: var(--text); font-size: 12.5px; font-weight: 750; cursor: pointer; }
+.dispatch-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.dispatch-chev { color: var(--dim); font-size: 11px; }
+.dispatch-panel { position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; width: 264px; max-width: 86vw; max-height: 320px; overflow: auto; padding: 6px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-strong); box-shadow: 0 12px 28px rgba(16,38,59,.18); }
+.dispatch-opt { display: flex; align-items: center; gap: 9px; padding: 8px 9px; border-radius: 6px; font-size: 13px; font-weight: 650; color: var(--text); cursor: pointer; }
+.dispatch-opt:hover { background: var(--surface); }
+.dispatch-opt input { width: 17px; height: 17px; margin: 0; accent-color: var(--navy); flex: 0 0 auto; cursor: pointer; }
+.dispatch-opt .dispatch-count { margin-left: auto; color: var(--dim); font-size: 12px; font-weight: 700; }
+.dispatch-all { border-bottom: 1px solid var(--border); border-radius: 6px 6px 0 0; font-weight: 800; }
 
 .report-list { margin-top: 10px; }
 .desktop-head { display: none; }
@@ -279,7 +287,13 @@ a.next-load { font-size: 12px; font-weight: 700; }
             <button type="button" class="type-filter-btn" data-type="P" aria-pressed="false">Pick ups</button>
             <button type="button" class="type-filter-btn" data-type="D" aria-pressed="false">Deliveries</button>
           </div>
-          <select id="dispatcher" class="dispatch-select" aria-label="Filter by dispatcher" hidden></select>
+          <div class="dispatch-filter" id="dispatcher-filter" hidden>
+            <button type="button" id="dispatcher-btn" class="dispatch-btn" aria-haspopup="true" aria-expanded="false"><span id="dispatcher-btn-label">Dispatcher: All</span><span class="dispatch-chev" aria-hidden="true">▾</span></button>
+            <div class="dispatch-panel" id="dispatcher-panel" role="group" aria-label="Choose dispatchers" hidden>
+              <label class="dispatch-opt dispatch-all"><input type="checkbox" id="dispatcher-all"><span>All dispatchers</span><span class="dispatch-count" id="dispatcher-all-count"></span></label>
+              <div id="dispatcher-list"></div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -537,7 +551,7 @@ function saveNote(key, text){
 }
 
 /* ===== board ===== */
-const state={ q:"", lateOnly:false, gpsAtStopOnly:false, podOnly:false, type:"all", dispatcher:"all" };
+const state={ q:"", lateOnly:false, gpsAtStopOnly:false, podOnly:false, type:"all", dispatchersHidden:new Set() };
 
 function isLateStop(s){ return s.isLate===true || s.isLate===1; }
 function filtered(){
@@ -548,9 +562,9 @@ function filtered(){
     if(state.gpsAtStopOnly && !isGpsAtStop(s, nowMs)) return false;
     if(state.podOnly && !isPendingPod(s)) return false;
     if(state.type!=="all" && s.t!==state.type) return false;
-    if(state.dispatcher!=="all"){
-      const d=String(s.dispatcher==null?"":s.dispatcher).trim();
-      if(d.toLowerCase()!==state.dispatcher.toLowerCase()) return false;
+    if(state.dispatchersHidden.size){
+      const d=String(s.dispatcher==null?"":s.dispatcher).trim().toLowerCase()||"__none__";
+      if(state.dispatchersHidden.has(d)) return false;
     }
     if(q){
       const atStop=isGpsAtStop(s, nowMs);
@@ -854,39 +868,50 @@ function typeSectionHtml(kind, rows, nowMs){
     headHtml()+emptyNote+(rows.length?dateGroupsHtml(rows,nowMs):"")+'</section>';
 }
 
-/* ===== dispatcher filter ===== */
+/* ===== dispatcher filter (multi-select with checkboxes) ===== */
 let DP_SIG="";
 function dispatcherList(){
   const seen=new Map();
   STOPS.forEach(s=>{
     const d=String(s.dispatcher==null?"":s.dispatcher).trim();
-    if(d&&!seen.has(d.toLowerCase())) seen.set(d.toLowerCase(),d);
+    const key=d?d.toLowerCase():"__none__";
+    if(!seen.has(key)) seen.set(key, d||"(No dispatcher)");
   });
-  return [...seen.values()].sort((a,b)=>a.localeCompare(b));
+  return [...seen.entries()].map(([key,label])=>({key,label}))
+    .sort((a,b)=> (a.key==="__none__")-(b.key==="__none__") || a.label.localeCompare(b.label));
 }
 function syncDispatcherUI(){
-  const sel=$("dispatcher"); if(!sel) return;
+  const wrap=$("dispatcher-filter"); if(!wrap) return;
   const list=dispatcherList();
-  if(list.length===0){ sel.hidden=true; DP_SIG=""; state.dispatcher="all"; return; }
-  const match=list.find(d=>d.toLowerCase()===state.dispatcher.toLowerCase());
-  state.dispatcher=match?match:"all";
-  sel.hidden=false;
-  const sig=list.length+""+list.join("");
+  if(list.length===0){ wrap.hidden=true; DP_SIG=""; state.dispatchersHidden.clear(); return; }
+  wrap.hidden=false;
+  const keys=new Set(list.map(x=>x.key));
+  for(const k of [...state.dispatchersHidden]) if(!keys.has(k)) state.dispatchersHidden.delete(k);
+  const sig=list.map(x=>x.key).join("|");
+  const box=$("dispatcher-list");
   if(sig!==DP_SIG){
     DP_SIG=sig;
-    sel.innerHTML='<option value="all">Dispatcher: All</option>'+
-      list.map(d=>'<option value="'+esc(d)+'">'+esc(d)+'</option>').join("");
+    box.innerHTML=list.map(x=>'<label class="dispatch-opt"><input type="checkbox" data-dkey="'+esc(x.key)+'"><span>'+esc(x.label)+'</span><span class="dispatch-count" data-dcount="'+esc(x.key)+'"></span></label>').join("");
   }
   const dcounts=new Map();
   STOPS.forEach(s=>{
-    const d=String(s.dispatcher==null?"":s.dispatcher).trim().toLowerCase();
-    if(d) dcounts.set(d,(dcounts.get(d)||0)+1);
+    const d=String(s.dispatcher==null?"":s.dispatcher).trim().toLowerCase()||"__none__";
+    dcounts.set(d,(dcounts.get(d)||0)+1);
   });
-  for(const opt of sel.options){
-    if(opt.value==="all") opt.textContent="Dispatcher: All ("+STOPS.length+")";
-    else opt.textContent=opt.value+" ("+(dcounts.get(opt.value.toLowerCase())||0)+")";
-  }
-  if(sel.value!==state.dispatcher) sel.value=state.dispatcher;
+  box.querySelectorAll("input[data-dkey]").forEach(inp=>{
+    inp.checked=!state.dispatchersHidden.has(inp.getAttribute("data-dkey"));
+  });
+  box.querySelectorAll("[data-dcount]").forEach(sp=>{
+    sp.textContent="("+(dcounts.get(sp.getAttribute("data-dcount"))||0)+")";
+  });
+  const allBox=$("dispatcher-all");
+  allBox.checked=state.dispatchersHidden.size===0;
+  allBox.indeterminate=state.dispatchersHidden.size>0 && state.dispatchersHidden.size<list.length;
+  $("dispatcher-all-count").textContent="("+STOPS.length+")";
+  const vis=list.filter(x=>!state.dispatchersHidden.has(x.key));
+  $("dispatcher-btn-label").textContent = state.dispatchersHidden.size===0 ? "Dispatcher: All"
+    : vis.length===1 ? "Dispatcher: "+vis[0].label
+    : "Dispatcher: "+vis.length+" of "+list.length;
 }
 
 /* ===== render ===== */
@@ -975,11 +1000,38 @@ $("gps-toggle").addEventListener("click",()=>{ state.gpsAtStopOnly=!state.gpsAtS
 $("pod-toggle").addEventListener("click",()=>{ state.podOnly=!state.podOnly; render(); });
 document.querySelectorAll(".type-filter-btn").forEach(b=>
   b.addEventListener("click",()=>{ state.type=b.getAttribute("data-type"); render(); }));
-$("dispatcher").addEventListener("change",e=>{ state.dispatcher=e.target.value; render(); });
+$("dispatcher-btn").addEventListener("click",e=>{
+  e.stopPropagation();
+  const panel=$("dispatcher-panel");
+  const open=panel.hidden;
+  panel.hidden=!open;
+  $("dispatcher-btn").setAttribute("aria-expanded", open?"true":"false");
+});
+document.addEventListener("click",e=>{
+  const wrap=$("dispatcher-filter");
+  if(wrap && !wrap.contains(e.target)){
+    $("dispatcher-panel").hidden=true;
+    $("dispatcher-btn").setAttribute("aria-expanded","false");
+  }
+});
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){ const p=$("dispatcher-panel"); if(p && !p.hidden){ p.hidden=true; $("dispatcher-btn").setAttribute("aria-expanded","false"); } }
+});
+$("dispatcher-list").addEventListener("change",e=>{
+  const inp=e.target.closest("input[data-dkey]"); if(!inp) return;
+  const k=inp.getAttribute("data-dkey");
+  if(inp.checked) state.dispatchersHidden.delete(k); else state.dispatchersHidden.add(k);
+  render();
+});
+$("dispatcher-all").addEventListener("change",e=>{
+  if(e.target.checked) state.dispatchersHidden.clear();
+  else dispatcherList().forEach(x=>state.dispatchersHidden.add(x.key));
+  render();
+});
 
 $("board").addEventListener("click",e=>{
   const clear=e.target.closest('[data-act="clear"]');
-  if(clear){ state.q=""; state.lateOnly=false; state.gpsAtStopOnly=false; state.podOnly=false; state.type="all"; state.dispatcher="all"; $("q").value=""; render(); return; }
+  if(clear){ state.q=""; state.lateOnly=false; state.gpsAtStopOnly=false; state.podOnly=false; state.type="all"; state.dispatchersHidden.clear(); $("q").value=""; render(); return; }
 
   const nb=e.target.closest(".note-button");
   if(nb){ EDITING=nb.getAttribute("data-key"); render(); return; }
