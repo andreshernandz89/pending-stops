@@ -227,8 +227,8 @@ a.next-load { font-size: 12px; font-weight: 700; }
 }
 
 @media (min-width: 1100px) {
-  .desktop-head { display: grid; grid-template-columns: 100px minmax(140px,.95fr) 56px 140px 150px 100px minmax(210px,1.6fr) minmax(120px,.8fr); gap: 14px; padding: 9px 14px; color: var(--dim); border-bottom: 2px solid var(--navy); font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
-  .stop-row { grid-template-columns: 100px minmax(140px,.95fr) 56px 140px 150px 100px minmax(210px,1.6fr) minmax(120px,.8fr); grid-template-areas: "truck load st appointment time miles place note"; gap: 12px; align-items: center; min-height: 54px; padding: 5px 14px; box-shadow: none; }
+  .desktop-head { display: grid; grid-template-columns: 100px minmax(140px,.95fr) 56px 140px minmax(120px,.8fr) 100px minmax(210px,1.6fr) 150px; gap: 14px; padding: 9px 14px; color: var(--dim); border-bottom: 2px solid var(--navy); font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 11px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+  .stop-row { grid-template-columns: 100px minmax(140px,.95fr) 56px 140px minmax(120px,.8fr) 100px minmax(210px,1.6fr) 150px; grid-template-areas: "truck load st appointment note miles place time"; gap: 12px; align-items: center; min-height: 54px; padding: 5px 14px; box-shadow: none; }
   .truck-number { font-size: 21px; }
   .truck-cell { align-items: flex-start; flex-direction: column; gap: 2px; }
   .load-cell { align-items: flex-start; text-align: left; }
@@ -847,7 +847,7 @@ function headHtml(){
   const ms=state.milesSort;
   const milesHead='<span class="sort-head" data-sort="miles" title="Sort by miles">Miles'+(ms?' <span class="arr">'+(ms==="asc"?"\u25B2":"\u25BC")+'</span>':"")+'</span>';
   return '<div class="desktop-head"><span>Truck</span><span>Load #</span>'+
-    '<span>ST</span><span>Appt</span><span>ETA</span>'+milesHead+'<span>Next stop</span><span>Notes</span></div>';
+    '<span>ST</span><span>Appt</span><span>Notes</span>'+milesHead+'<span>Next stop</span><span>ETA</span></div>';
 }
 function dateGroupsHtml(rows, nowMs){
   if(state.milesSort){
