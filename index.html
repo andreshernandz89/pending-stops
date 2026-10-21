@@ -80,6 +80,11 @@ main { width: min(1500px, 100%); margin: 0 auto; padding: 12px; }
 .gps-toggle.active { color: white; border-color: var(--amber); background: var(--amber); }
 .pod-toggle { padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; color: var(--blue); background: transparent; font-size: 12px; font-weight: 700; cursor: pointer; }
 .pod-toggle.active { color: white; border-color: var(--blue); background: var(--blue); }
+.clear-toggle { padding: 4px 8px; border: 1px solid var(--border); border-radius: 4px; color: var(--dim); background: transparent; font-size: 12px; font-weight: 700; cursor: pointer; }
+.clear-toggle:hover { color: var(--text); border-color: var(--dim); }
+.desktop-head .sort-head { cursor: pointer; }
+.desktop-head .sort-head:hover { color: var(--text); }
+.desktop-head .sort-head .arr { font-size: 9px; }
 .filter-row { margin-top: 12px; display: flex; flex-direction: column; gap: 9px; }
 .search-box { min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-strong); }
 .search-box:focus-within { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(15,122,79,.18); }
@@ -275,6 +280,7 @@ a.next-load { font-size: 12px; font-weight: 700; }
           <button class="late-toggle" id="late-toggle" aria-pressed="false"><span id="c-late">0</span> late ETA</button>
           <button class="gps-toggle" id="gps-toggle" aria-pressed="false" title="Trucks whose GPS is already at the stop but SOS arrival is not signed yet"><span id="c-gps-at-stop">0</span> at stop · SOS pending</button>
           <button class="pod-toggle" id="pod-toggle" aria-pressed="false" title="Loads where the truck is ON SITE at the last stop (delivery)"><span id="c-pod">0</span> pending POD</button>
+          <button class="clear-toggle" id="clear-filters" type="button">Clear filters</button>
         </div>
         <div class="filter-row">
           <label class="search-box">
@@ -551,7 +557,7 @@ function saveNote(key, text){
 }
 
 /* ===== board ===== */
-const state={ q:"", lateOnly:false, gpsAtStopOnly:false, podOnly:false, type:"all", dispatchersHidden:new Set() };
+const state={ q:"", lateOnly:false, gpsAtStopOnly:false, podOnly:false, milesSort:null, type:"all", dispatchersHidden:new Set() };
 
 function isLateStop(s){ return s.isLate===true || s.isLate===1; }
 function filtered(){
@@ -838,10 +844,24 @@ function rowHtml(s, nowMs){
   '</article>';
 }
 function headHtml(){
-  return '<div class="desktop-head" aria-hidden="true"><span>Truck</span><span>Load #</span>'+
-    '<span>ST</span><span>Appt</span><span>ETA</span><span>Miles</span><span>Next stop</span><span>Notes</span></div>';
+  const ms=state.milesSort;
+  const milesHead='<span class="sort-head" data-sort="miles" title="Sort by miles">Miles'+(ms?' <span class="arr">'+(ms==="asc"?"\u25B2":"\u25BC")+'</span>':"")+'</span>';
+  return '<div class="desktop-head"><span>Truck</span><span>Load #</span>'+
+    '<span>ST</span><span>Appt</span><span>ETA</span>'+milesHead+'<span>Next stop</span><span>Notes</span></div>';
 }
 function dateGroupsHtml(rows, nowMs){
+  if(state.milesSort){
+    const dir=state.milesSort==="asc"?1:-1;
+    const byMiles=rows.slice().sort((a,b)=>{
+      const ma=(a.miles==null||a.miles==="")?null:Number(a.miles);
+      const mb=(b.miles==null||b.miles==="")?null:Number(b.miles);
+      if(ma==null&&mb==null) return new Date(a.appt)-new Date(b.appt);
+      if(ma==null) return 1;
+      if(mb==null) return -1;
+      return (ma-mb)*dir || (new Date(a.appt)-new Date(b.appt));
+    });
+    return '<div class="rows">'+byMiles.map(s2=>rowHtml(s2,nowMs)).join("")+'</div>';
+  }
   rows=rows.slice().sort((a,b)=>new Date(a.appt)-new Date(b.appt));
   const map=new Map();
   rows.forEach(s=>{
@@ -998,6 +1018,8 @@ $("q").addEventListener("input",e=>{ state.q=e.target.value; render(); });
 $("late-toggle").addEventListener("click",()=>{ state.lateOnly=!state.lateOnly; render(); });
 $("gps-toggle").addEventListener("click",()=>{ state.gpsAtStopOnly=!state.gpsAtStopOnly; render(); });
 $("pod-toggle").addEventListener("click",()=>{ state.podOnly=!state.podOnly; render(); });
+function clearFilters(){ state.q=""; state.lateOnly=false; state.gpsAtStopOnly=false; state.podOnly=false; state.milesSort=null; state.type="all"; state.dispatchersHidden.clear(); $("q").value=""; render(); }
+$("clear-filters").addEventListener("click",clearFilters);
 document.querySelectorAll(".type-filter-btn").forEach(b=>
   b.addEventListener("click",()=>{ state.type=b.getAttribute("data-type"); render(); }));
 $("dispatcher-btn").addEventListener("click",e=>{
@@ -1030,8 +1052,11 @@ $("dispatcher-all").addEventListener("change",e=>{
 });
 
 $("board").addEventListener("click",e=>{
+  const sh=e.target.closest('[data-sort="miles"]');
+  if(sh){ state.milesSort = state.milesSort===null ? "asc" : state.milesSort==="asc" ? "desc" : null; render(); return; }
+
   const clear=e.target.closest('[data-act="clear"]');
-  if(clear){ state.q=""; state.lateOnly=false; state.gpsAtStopOnly=false; state.podOnly=false; state.type="all"; state.dispatchersHidden.clear(); $("q").value=""; render(); return; }
+  if(clear){ clearFilters(); return; }
 
   const nb=e.target.closest(".note-button");
   if(nb){ EDITING=nb.getAttribute("data-key"); render(); return; }
