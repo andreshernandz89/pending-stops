@@ -559,7 +559,7 @@ function saveNote(key, text){
 /* ===== board ===== */
 const state={ q:"", lateOnly:false, gpsAtStopOnly:false, podOnly:false, milesSort:null, type:"all", dispatchersHidden:new Set() };
 
-function isLateStop(s){ return s.isLate===true || s.isLate===1; }
+function isLateStop(s){ if(s && s.arrivedTs && !s.departedTs) return false; return s.isLate===true || s.isLate===1; }
 function filtered(){
   const q=state.q.trim().toLowerCase();
   const nowMs=Date.now();
