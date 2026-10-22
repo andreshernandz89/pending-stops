@@ -574,7 +574,7 @@ function filtered(){
     }
     if(q){
       const atStop=isGpsAtStop(s, nowMs);
-      const hay=(s.truck+" "+s.load+" "+(s.ref||"")+" "+(s.broker||"")+" "+(s.addr||"")+" "+(s.parada||"")+" "+(s.st||"")+" "+(NOTES[s.id]||"")+" "+(s.driver||"")+" "+(s.drv||"")+" "+(s.co||"")+" "+(s.dispatcher||"")+" "+(s.hosRisk?"hos risk":"")+" "+(atStop?"gps at stop sos pending arrived":"")).toLowerCase();
+      const hay=(s.truck+" "+s.load+" "+(s.ref||"")+" "+(s.broker||"")+" "+(s.addr||"")+" "+(s.parada||"")+" "+(s.st||"")+" "+(NOTES[s.id]||"")+" "+(s.driver||"")+" "+(s.drv||"")+" "+(s.co||"")+" "+(s.dispatcher||"")+" "+(s.hosRisk?"hos risk":"")+" "+(atStop?"gps at stop sos pending arrived":"")+" "+(s.nextLoad?((s.nextLoad.load||"")+" "+(s.nextLoad.ref||"")+" "+(s.nextLoad.broker||"")+" "+(s.nextLoad.parada||"")):"")).toLowerCase();
       if(!hay.includes(q)) return false;
     }
     return true;
