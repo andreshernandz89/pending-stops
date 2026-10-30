@@ -568,7 +568,14 @@ function filtered(){
     if(state.lateOnly && !isLateStop(s)) return false;
     if(state.gpsAtStopOnly && !isGpsAtStop(s, nowMs)) return false;
     if(state.podOnly && !isPendingPod(s)) return false;
-    if(state.type!=="all" && s.t!==state.type) return false;
+    if(state.type==="P" && s.t!=="P"){
+      /* Una fila en delivery con reload (nextLoad) cuya cita es hoy o antes SI entra al filtro de pick ups:
+         de su nextLoad se construye la fila de pickup en render(). Antes el filtro la descartaba aqui
+         y el truck desaparecia del filtro Pick ups aunque tuviera un pickup pendiente (caso trk 55). */
+      const nl=(s.nextLoad&&typeof s.nextLoad==="object")?s.nextLoad:null;
+      if(!nl||!nl.load) return false;
+      if(nl.appt){ const ms=new Date(nl.appt).getTime(); const end=new Date(); end.setHours(23,59,59,999); if(!isNaN(ms)&&ms>end.getTime()) return false; }
+    } else if(state.type==="D" && s.t==="P") return false;
     if(state.dispatchersHidden.size){
       const d=String(s.dispatcher==null?"":s.dispatcher).trim().toLowerCase()||"__none__";
       if(state.dispatchersHidden.has(d)) return false;
