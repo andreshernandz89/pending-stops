@@ -146,6 +146,7 @@ a.gps-mark { text-decoration: none; }
 a.gps-mark.on { cursor: pointer; box-shadow: inset 0 0 0 1px rgba(255,255,255,.35); transition: filter .12s ease, box-shadow .12s ease; }
 a.gps-mark.on:hover { filter: brightness(1.12); box-shadow: inset 0 0 0 1px rgba(255,255,255,.55), 0 0 0 2px rgba(15,122,79,.35); }
 a.gps-mark.on:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; filter: brightness(1.12); }
+.av-tag { flex: 0 0 auto; font-size: 10px; font-weight: 600; opacity: .65; white-space: nowrap; }
 
 .load-cell { grid-area: load; display: flex; align-items: flex-end; flex-direction: column; gap: 1px; min-width: 0; color: var(--dim); text-align: right; font-size: 10px; }
 .load-cell > span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -619,7 +620,14 @@ function truckLocationUrl(s){
   const sr=(s.samsaraRoute&&typeof s.samsaraRoute==="object")?s.samsaraRoute:null;
   return samsaraUrl(sr?sr.liveUrl:null);
 }
+function esAvalanche(s){
+  const g=(s&&s.gps&&typeof s.gps==="object")?s.gps:null;
+  if(g&&String(g.fleet)==="3") return true;
+  const u=truckLocationUrl(s);
+  return !!(u&&u.indexOf("/o/7011081/")>=0);
+}
 function gpsMarkHtml(s, nowMs){
+  const av=esAvalanche(s)?'<span class="av-tag">(Avalanche)</span>':"";
   const on=gpsActive(s, nowMs);
   const raw=stopGpsRaw(s);
   const t=raw?new Date(raw):null;
@@ -631,11 +639,11 @@ function gpsMarkHtml(s, nowMs){
     const url=truckLocationUrl(s);
     if(url){
       return '<a class="gps-mark on" href="'+esc(url)+'" target="_blank" rel="noopener"'+
-        ' title="'+esc(title+" · view truck location in Samsara (opens in a new window)")+'" aria-label="View truck '+esc(s.truck)+' live location in Samsara (opens in a new window)">gps on</a>';
+        ' title="'+esc(title+" · view truck location in Samsara (opens in a new window)")+'" aria-label="View truck '+esc(s.truck)+' live location in Samsara (opens in a new window)">gps on</a>'+av;
     }
-    return '<span class="gps-mark on" title="'+esc(title)+'">gps on</span>';
+    return '<span class="gps-mark on" title="'+esc(title)+'">gps on</span>'+av;
   }
-  return '<span class="gps-mark off" title="'+esc(title)+'">gps off</span>';
+  return '<span class="gps-mark off" title="'+esc(title)+'">gps off</span>'+av;
 }
 
 /* ===== arrival / departure pills ===== */
