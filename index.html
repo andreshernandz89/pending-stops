@@ -213,6 +213,7 @@ a.next-load { font-size: 12px; font-weight: 700; }
 .copyupd-tooltip { position: absolute; left: 0; top: calc(100% + 8px); z-index: 40; width: max-content; max-width: min(290px, calc(100vw - 48px)); padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; pointer-events: none; visibility: hidden; opacity: 0; transform: translateY(-3px); border: 1px solid rgba(255,255,255,.14); border-radius: 5px; color: #eef5f8; background: #0b1c2b; box-shadow: 0 10px 24px rgba(4,15,24,.28); font-size: 12px; line-height: 1.45; text-align: left; transition: opacity .12s ease, transform .12s ease, visibility .12s; }
 .copyupd-tooltip strong { font-size: 13px; color: #fff; }
 .copyupd-anchor:hover .copyupd-tooltip, .copyupd-anchor:focus-within .copyupd-tooltip { visibility: visible; opacity: 1; transform: translateY(0); }
+.copyupd-preview { border-top: 1px solid rgba(255,255,255,.14); margin-top: 4px; padding-top: 6px; font-size: 11px; line-height: 1.5; color: #cfe3ec; }
 .copyupd-btn.busy { opacity: .5; }
 .copyupd-btn.ok { color: var(--green); border-color: var(--green); }
 .copyupd-btn.fail { color: var(--danger); border-color: var(--danger); }
@@ -876,7 +877,7 @@ function rowHtml(s, nowMs){
     '<div class="time-cell'+(late?" late":"")+'">'+(arrivalState(s)==="onsite"?"":'<span class="mobile-label">ETA</span><span class="eta-label">'+etaTooltipHtml(s)+'</span>')+'</div>'+
     '<div class="miles-cell"><span class="mobile-label">Miles</span><span class="miles-wrap"><strong>'+(s.miles==null?"—":esc(fmtNum(s.miles)))+'</strong>'+
       routeIconHtml(s)+routeProgressHtml(s)+((s.stopIndex&&s.stopCount)?'<span class="stop-count">Stop '+s.stopIndex+'/'+s.stopCount+'</span>':"")+'</span></div>'+
-    '<div class="place-cell"><span>'+esc(s.parada||s.addr||"Address unavailable")+'</span>'+(s.prevDlvry?'<span class="prev-dlvry-pill">ON PREVIOUS DLVRY</span>':arrivalPillHtml(s)+gpsAtStopPillHtml(s,nowMs)+verifyBtnHtml(s))+'<span class="copyupd-anchor"><button type="button" class="copyupd-btn" data-copyup="'+esc(s.id)+'" aria-label="Copy broker update email for truck '+esc(s.truck)+'"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></button><span class="copyupd-tooltip" role="tooltip"><strong>Copy broker update</strong><span>Copies an email-ready update for this truck: where it is now, miles to the stop and ETA, with OTP / OTD status for the appointment. Paste it into your email to the broker.</span></span></span></div>'+
+    '<div class="place-cell"><span>'+esc(s.parada||s.addr||"Address unavailable")+'</span>'+(s.prevDlvry?'<span class="prev-dlvry-pill">ON PREVIOUS DLVRY</span>':arrivalPillHtml(s)+gpsAtStopPillHtml(s,nowMs)+verifyBtnHtml(s))+'<span class="copyupd-anchor"><button type="button" class="copyupd-btn" data-copyup="'+esc(s.id)+'" aria-label="Copy broker update email for truck '+esc(s.truck)+'"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></button><span class="copyupd-tooltip" role="tooltip"><strong>Copy broker update</strong><span>Copies an email-ready update for this truck: where it is now, miles to the stop and ETA, with OTP / OTD status for the appointment. Paste it into your email to the broker.</span><span class="copyupd-preview">'+esc(buildBrokerUpdate(s,null)).replace(/\n/g,"<br>")+'</span></span></span></div>'+
     noteCellHtml(s)+
   '</article>';
 }
@@ -1425,7 +1426,6 @@ $("board").addEventListener("click",e=>{
 
   const cb=e.target.closest("[data-copyup]");
   if(cb){ copyBrokerUpdate(cb, cb.getAttribute("data-copyup")); return; }
-
   const cancel=e.target.closest('[data-act="cancel"]');
   if(cancel){ EDITING=null; render(); return; }
 
@@ -1433,6 +1433,19 @@ $("board").addEventListener("click",e=>{
   if(tn){ tn.closest(".crew-anchor").classList.toggle("force"); return; }
   const ev=e.target.closest(".eta-value");
   if(ev){ ev.closest(".eta-anchor").classList.toggle("force"); return; }
+});
+$("board").addEventListener("mouseover",e=>{
+  const a=e.target.closest(".copyupd-anchor");
+  if(!a||a.dataset.cityDone) return;
+  const btn=a.querySelector("[data-copyup]"); if(!btn) return;
+  a.dataset.cityDone="1";
+  const s=findDisplayStop(btn.getAttribute("data-copyup"));
+  if(!s) return;
+  resolveCity(s).then(city=>{
+    if(!city) return;
+    const pv=a.querySelector(".copyupd-preview");
+    if(pv) pv.innerHTML=esc(buildBrokerUpdate(s,city)).replace(/\n/g,"<br>");
+  });
 });
 $("board").addEventListener("submit",e=>{
   const form=e.target.closest(".note-form"); if(!form) return;
