@@ -282,6 +282,7 @@ a.next-load { font-size: 12px; font-weight: 700; }
           <button class="gps-toggle" id="gps-toggle" aria-pressed="false" title="Trucks whose GPS is already at the stop but SOS arrival is not signed yet"><span id="c-gps-at-stop">0</span> at stop · SOS pending</button>
           <button class="pod-toggle" id="pod-toggle" aria-pressed="false" title="Loads where the truck is ON SITE at the last stop (delivery)"><span id="c-pod">0</span> pending POD</button>
           <button class="clear-toggle" id="clear-filters" type="button">Clear filters</button>
+          <button class="clear-toggle" id="export-excel" type="button">Export Excel</button>
         </div>
         <div class="filter-row">
           <label class="search-box">
@@ -314,6 +315,7 @@ a.next-load { font-size: 12px; font-weight: 700; }
 
 <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-database-compat.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 <script>
 "use strict";
 /* ===== data (stops arrive live from Firebase /stops) ===== */
@@ -1028,6 +1030,122 @@ function render(){
   $("board").hidden=false;
 }
 
+/* ===== export to Excel (exactly the filtered view on screen) ===== */
+const EXPORT_HEADERS=["SECTION","TRUCK","LOAD #","ROUTE","BROKER / REF","NEXT LOAD","ST","APPT","NOTES","MILES","NEXT STOP","ETA","STATUS","LATE","DISPATCHER","DRIVER"];
+const EXPORT_WIDTHS=[11,9,11,9,30,11,5,20,40,9,45,20,24,6,16,22];
+function sortSectionForExport(list){
+  if(state.milesSort){
+    const dir=state.milesSort==="asc"?1:-1;
+    return list.slice().sort((a,b)=>{
+      const ma=(a.miles==null||a.miles==="")?null:Number(a.miles);
+      const mb=(b.miles==null||b.miles==="")?null:Number(b.miles);
+      if(ma==null&&mb==null) return new Date(a.appt)-new Date(b.appt);
+      if(ma==null) return 1;
+      if(mb==null) return -1;
+      return (ma-mb)*dir || (new Date(a.appt)-new Date(b.appt));
+    });
+  }
+  return list.slice().sort((a,b)=>{
+    const ta=new Date(a.appt).getTime(), tb=new Date(b.appt).getTime();
+    const na=isNaN(ta), nb=isNaN(tb);
+    if(na&&nb) return 0;
+    if(na) return 1;
+    if(nb) return -1;
+    return ta-tb;
+  });
+}
+function buildExportRows(){
+  const nowMs=Date.now();
+  const rows=filtered();
+  const deliveries=rows.filter(s=>s.t!=="P");
+  const pickups=rows.filter(s=>s.t==="P");
+  if(state.type!=="D"){
+    const endToday=new Date(); endToday.setHours(23,59,59,999);
+    deliveries.forEach(s=>{
+      const nl=(s.nextLoad&&typeof s.nextLoad==="object")?s.nextLoad:null;
+      if(!nl||!nl.load) return;
+      if(nl.appt){ const ms=new Date(nl.appt).getTime(); if(!isNaN(ms)&&ms>endToday.getTime()) return; }
+      pickups.push(Object.assign({}, s, {
+        t:"P", type:"PICK UP", load:String(nl.load), sosId:(nl.sosId==null?"":nl.sosId),
+        appt:nl.appt||null, parada:nl.parada||"", addr:nl.parada||"",
+        st:nl.st||"", broker:nl.broker||"", ref:nl.ref||"", route:(nl.route||""),
+        miles:(nl.miles!=null?nl.miles:null), eta:null, isLate:false, hos:null, hosRisk:false,
+        arrivedTs:null, departedTs:null, signedBy:"",
+        stopIndex:nl.stopIndex||null, stopCount:nl.stopCount||null,
+        isLastStop:false, nextLoad:null,
+        stopLat:(nl.lat!=null?nl.lat:null), stopLng:(nl.lng!=null?nl.lng:null), gpsAtStop:false, samsaraRoute:null,
+        id:"p:"+nl.load+":"+s.truck, prevDlvry:true
+      }));
+    });
+  }
+  const out=[];
+  const pushRow=(section,s)=>{
+    const st=arrivalState(s);
+    const parts=[];
+    if(s.prevDlvry) parts.push("ON PREVIOUS DLVRY");
+    else{
+      if(st==="onsite") parts.push("ON SITE");
+      else if(st==="enroute") parts.push("EN ROUTE");
+      if(isGpsAtStop(s, nowMs)) parts.push("GPS AT STOP");
+    }
+    let etaTxt="";
+    if(st!=="onsite" && s.eta){
+      const e=new Date(s.eta);
+      if(!isNaN(e.getTime())) etaTxt=(fmtEtaD.format(e)!==fmtEtaD.format(NOW_ETA)?fmtEtaD.format(e)+" \u00b7 ":"")+fmtEtaT.format(e);
+    }
+    const milesNum=(s.miles==null||s.miles==="")?null:Number(s.miles);
+    out.push([
+      section,
+      s.truck==null?"":String(s.truck),
+      s.load==null?"":String(s.load),
+      s.route||"",
+      brokerRefLine(s),
+      (s.nextLoad&&s.nextLoad.load!=null)?String(s.nextLoad.load):"",
+      s.st||"",
+      fmtAppt(new Date(s.appt)),
+      NOTES[s.id]||"",
+      (milesNum==null||isNaN(milesNum))?null:milesNum,
+      s.parada||s.addr||"",
+      etaTxt,
+      parts.join(" \u00b7 "),
+      isLateStop(s)?"Yes":"",
+      s.dispatcher||"",
+      s.driver||s.drv||""
+    ]);
+  };
+  if(state.type!=="D") sortSectionForExport(pickups).forEach(s=>pushRow("PICK UP",s));
+  if(state.type!=="P") sortSectionForExport(deliveries).forEach(s=>pushRow("DELIVERY",s));
+  return out;
+}
+function downloadBlob(blob, name){
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; a.download=name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 4000);
+}
+function exportExcel(){
+  const data=buildExportRows();
+  const now=new Date();
+  const p2=n=>String(n).padStart(2,"0");
+  const stamp=now.getFullYear()+p2(now.getMonth()+1)+p2(now.getDate())+"-"+p2(now.getHours())+p2(now.getMinutes());
+  if(window.XLSX && XLSX.utils && XLSX.writeFile){
+    const ws=XLSX.utils.aoa_to_sheet([EXPORT_HEADERS].concat(data));
+    ws["!cols"]=EXPORT_WIDTHS.map(w=>({wch:w}));
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Pending Stops");
+    XLSX.writeFile(wb, "pending-stops-"+stamp+".xlsx");
+    return;
+  }
+  /* Fallback: .xls (HTML table) when the SheetJS CDN did not load, so the button never dead-ends */
+  const cell=v=>"<td>"+esc(v==null?"":String(v))+"</td>";
+  const html='<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="UTF-8"></head><body><table>'+
+    "<tr>"+EXPORT_HEADERS.map(h=>"<th>"+esc(h)+"</th>").join("")+"</tr>"+
+    data.map(r=>"<tr>"+r.map(cell).join("")+"</tr>").join("")+
+    "</table></body></html>";
+  downloadBlob(new Blob(["\ufeff"+html],{type:"application/vnd.ms-excel"}), "pending-stops-"+stamp+".xls");
+}
+
 /* ===== controls ===== */
 $("q").addEventListener("input",e=>{ state.q=e.target.value; render(); });
 $("late-toggle").addEventListener("click",()=>{ state.lateOnly=!state.lateOnly; render(); });
@@ -1035,6 +1153,7 @@ $("gps-toggle").addEventListener("click",()=>{ state.gpsAtStopOnly=!state.gpsAtS
 $("pod-toggle").addEventListener("click",()=>{ state.podOnly=!state.podOnly; render(); });
 function clearFilters(){ state.q=""; state.lateOnly=false; state.gpsAtStopOnly=false; state.podOnly=false; state.milesSort=null; state.type="all"; state.dispatchersHidden.clear(); $("q").value=""; render(); }
 $("clear-filters").addEventListener("click",clearFilters);
+$("export-excel").addEventListener("click",exportExcel);
 document.querySelectorAll(".type-filter-btn").forEach(b=>
   b.addEventListener("click",()=>{ state.type=b.getAttribute("data-type"); render(); }));
 $("dispatcher-btn").addEventListener("click",e=>{
