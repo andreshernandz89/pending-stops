@@ -205,6 +205,13 @@ a.next-load { font-size: 12px; font-weight: 700; }
 .stopdone-btn:hover { background: rgba(46,125,50,.12); }
 .stopdone-btn.checking { border-color: var(--dim); color: var(--dim); cursor: default; }
 .stopdone-btn.checking:hover { background: transparent; }
+.copyupd-btn { display: inline-flex; align-items: center; justify-content: center; width: 29px; height: 29px; padding: 0; margin-left: 6px; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); color: var(--accent); cursor: pointer; vertical-align: middle; }
+.copyupd-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.copyupd-btn:hover { border-color: var(--accent); }
+.copyupd-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.copyupd-btn.busy { opacity: .5; }
+.copyupd-btn.ok { color: var(--green); border-color: var(--green); }
+.copyupd-btn.fail { color: var(--danger); border-color: var(--danger); }
 .note-button:not(:hover) { text-decoration-color: var(--border); }
 .note-form { width: 100%; }
 .note-form textarea { width: 100%; padding: 8px; resize: vertical; border: 1px solid var(--border); border-radius: 5px; outline: none; color: var(--text); background: var(--bg); font-size: 12px; }
@@ -865,7 +872,7 @@ function rowHtml(s, nowMs){
     '<div class="time-cell'+(late?" late":"")+'">'+(arrivalState(s)==="onsite"?"":'<span class="mobile-label">ETA</span><span class="eta-label">'+etaTooltipHtml(s)+'</span>')+'</div>'+
     '<div class="miles-cell"><span class="mobile-label">Miles</span><span class="miles-wrap"><strong>'+(s.miles==null?"—":esc(fmtNum(s.miles)))+'</strong>'+
       routeIconHtml(s)+routeProgressHtml(s)+((s.stopIndex&&s.stopCount)?'<span class="stop-count">Stop '+s.stopIndex+'/'+s.stopCount+'</span>':"")+'</span></div>'+
-    '<div class="place-cell"><span>'+esc(s.parada||s.addr||"Address unavailable")+'</span>'+(s.prevDlvry?'<span class="prev-dlvry-pill">ON PREVIOUS DLVRY</span>':arrivalPillHtml(s)+gpsAtStopPillHtml(s,nowMs)+verifyBtnHtml(s))+'</div>'+
+    '<div class="place-cell"><span>'+esc(s.parada||s.addr||"Address unavailable")+'</span>'+(s.prevDlvry?'<span class="prev-dlvry-pill">ON PREVIOUS DLVRY</span>':arrivalPillHtml(s)+gpsAtStopPillHtml(s,nowMs)+verifyBtnHtml(s))+'<button type="button" class="copyupd-btn" data-copyup="'+esc(s.id)+'" title="Copy broker update (email): location, miles, ETA and OTP/OTD status" aria-label="Copy broker update email for truck '+esc(s.truck)+'"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></button></div>'+
     noteCellHtml(s)+
   '</article>';
 }
@@ -1215,6 +1222,135 @@ function checkLateTransitions(){
   if(lateAlertMode==="sound") playLateBeep();
 }
 
+/* ===== broker update (Copy update button) ===== */
+function findDisplayStop(id){
+  const base=STOPS.find(s=>s.id===id);
+  if(base) return base;
+  if(id.indexOf("p:")===0){
+    const endToday=new Date(); endToday.setHours(23,59,59,999);
+    for(const s of STOPS){
+      if(s.t==="P") continue;
+      const nl=(s.nextLoad&&typeof s.nextLoad==="object")?s.nextLoad:null;
+      if(!nl||!nl.load) continue;
+      if("p:"+nl.load+":"+s.truck!==id) continue;
+      if(nl.appt){ const ms=new Date(nl.appt).getTime(); if(!isNaN(ms)&&ms>endToday.getTime()) return null; }
+      return Object.assign({}, s, {
+        t:"P", type:"PICK UP", load:String(nl.load), sosId:(nl.sosId==null?"":nl.sosId),
+        appt:nl.appt||null, parada:nl.parada||"", addr:nl.parada||"",
+        st:nl.st||"", broker:nl.broker||"", ref:nl.ref||"", route:(nl.route||""),
+        miles:(nl.miles!=null?nl.miles:null), eta:null, isLate:false, hos:null, hosRisk:false,
+        arrivedTs:null, departedTs:null, signedBy:"",
+        stopIndex:nl.stopIndex||null, stopCount:nl.stopCount||null,
+        isLastStop:false, nextLoad:null,
+        stopLat:(nl.lat!=null?nl.lat:null), stopLng:(nl.lng!=null?nl.lng:null), gpsAtStop:false, samsaraRoute:null,
+        id:id, prevDlvry:true
+      });
+    }
+  }
+  return null;
+}
+const cityCache=new Map();
+async function resolveCity(s){
+  const c=truckCoords(s);
+  if(!c||!gpsActive(s, Date.now())) return null;
+  const key=c.lat.toFixed(2)+","+c.lng.toFixed(2);
+  if(cityCache.has(key)) return cityCache.get(key);
+  let out=null;
+  try{
+    const r=await fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&lat="+c.lat+"&lon="+c.lng);
+    if(r.ok){
+      const j=await r.json(), a=(j&&j.address)||{};
+      const city=a.city||a.town||a.village||a.county||"";
+      const st=a.state_code||a.state||"";
+      if(city) out=st?city+", "+st:city;
+    }
+  }catch(e){}
+  cityCache.set(key,out);
+  return out;
+}
+const fmtMilParts=new Intl.DateTimeFormat("en-US",{timeZone:TZ,month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"});
+function fmtMil(d){
+  if(!d||isNaN(d.getTime())) return "";
+  const p={}; fmtMilParts.formatToParts(d).forEach(x=>{ p[x.type]=x.value; });
+  return p.month+"/"+p.day+" "+p.hour+p.minute;
+}
+function ordinalWord(n){
+  const s=String(n), d=n%10, h=n%100;
+  if(d===1&&h!==11) return s+"st";
+  if(d===2&&h!==12) return s+"nd";
+  if(d===3&&h!==13) return s+"rd";
+  return s+"th";
+}
+function stopTargetPhrase(s){
+  const isP=s.t==="P";
+  const place=isP?"the shipper":"the receiver", word=isP?"pick":"drop";
+  let ord=null;
+  const ls=Array.isArray(s.legStops)?s.legStops:null;
+  const idx=(s.stopIndex!=null&&s.stopIndex>0)?s.stopIndex-1:null;
+  if(ls&&idx!=null&&idx<ls.length){
+    const isPk=x=>{ const t=String((x&&(x.t||x.type))||"").toUpperCase(); return t==="P"||t.indexOf("PICK")===0; };
+    let n=0;
+    for(let i=0;i<=idx;i++) if(isPk(ls[i])===isP) n++;
+    if(n>0) ord=n;
+  }else if(isP&&idx!=null){
+    ord=idx+1;
+  }
+  return ord?place+" ("+ordinalWord(ord)+" "+word+")":place;
+}
+function buildBrokerUpdate(s, city){
+  const isP=s.t==="P", code=isP?"OTP":"OTD";
+  const target=stopTargetPhrase(s);
+  const hourET=Number(new Intl.DateTimeFormat("en-US",{timeZone:TZ,hour:"2-digit",hourCycle:"h23"}).format(new Date()));
+  const lines=[hourET<12?"Good morning,":"Good afternoon,",""];
+  const miles=(s.miles==null||s.miles==="")?null:Math.round(Number(s.miles));
+  const onsite=arrivalState(s)==="onsite";
+  const atStop=!onsite&&isGpsAtStop(s, Date.now());
+  if(onsite) lines.push("Truck is on site at "+target+".");
+  else if(atStop) lines.push("Truck is already at "+target+".");
+  else if(city&&miles!=null&&!isNaN(miles)) lines.push("Truck is passing by "+city+", "+miles+" miles from "+target+".");
+  else if(city) lines.push("Truck is passing by "+city+", heading to "+target+".");
+  else if(miles!=null&&!isNaN(miles)) lines.push("Truck is en route, "+miles+" miles from "+target+".");
+  else lines.push("Truck is en route to "+target+".");
+  if(!onsite&&!atStop){
+    lines.push("");
+    const apptMil=fmtMil(new Date(s.appt));
+    const e=s.eta?new Date(s.eta):null;
+    if(e&&!isNaN(e.getTime())){
+      lines.push(isLateStop(s)
+        ? "We\u2019re not good for "+code+" for "+apptMil+" appt \u2014 ETA "+fmtMil(e)+"."
+        : "We\u2019re good for "+code+" for "+apptMil+" appt.");
+    }else{
+      lines.push("ETA to be confirmed for "+apptMil+" appt.");
+    }
+  }
+  lines.push("","We\u2019ll keep you posted.");
+  return lines.join("\n");
+}
+async function copyBrokerUpdate(btn, id){
+  const s=findDisplayStop(id);
+  if(!s) return;
+  btn.classList.add("busy");
+  const done=ok=>{
+    btn.classList.remove("busy");
+    btn.classList.add(ok?"ok":"fail");
+    setTimeout(()=>btn.classList.remove("ok","fail"), 1600);
+  };
+  try{
+    const city=await resolveCity(s);
+    const text=buildBrokerUpdate(s, city);
+    let ok=false;
+    if(navigator.clipboard&&navigator.clipboard.writeText){ try{ await navigator.clipboard.writeText(text); ok=true; }catch(e){} }
+    if(!ok){
+      const ta=document.createElement("textarea");
+      ta.value=text; ta.style.position="fixed"; ta.style.opacity="0";
+      document.body.appendChild(ta); ta.select();
+      try{ ok=document.execCommand("copy"); }catch(e){}
+      ta.remove();
+    }
+    done(ok);
+  }catch(e){ done(false); }
+}
+
 /* ===== controls ===== */
 $("q").addEventListener("input",e=>{ state.q=e.target.value; render(); });
 $("late-toggle").addEventListener("click",()=>{ state.lateOnly=!state.lateOnly; render(); });
@@ -1274,6 +1410,9 @@ $("board").addEventListener("click",e=>{
 
   const vb=e.target.closest("[data-verify]");
   if(vb){ requestVerify(vb.getAttribute("data-verify"), vb.getAttribute("data-load"), vb.getAttribute("data-sosid")); return; }
+
+  const cb=e.target.closest("[data-copyup]");
+  if(cb){ copyBrokerUpdate(cb, cb.getAttribute("data-copyup")); return; }
 
   const cancel=e.target.closest('[data-act="cancel"]');
   if(cancel){ EDITING=null; render(); return; }
