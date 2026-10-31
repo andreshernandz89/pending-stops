@@ -1302,6 +1302,14 @@ function buildBrokerUpdate(s, city){
   const target=stopTargetPhrase(s);
   const hourET=Number(new Intl.DateTimeFormat("en-US",{timeZone:TZ,hour:"2-digit",hourCycle:"h23"}).format(new Date()));
   const lines=[hourET<12?"Good morning,":"Good afternoon,",""];
+  if(s.prevDlvry){
+    const pm=(s.miles==null||s.miles==="")?null:Math.round(Number(s.miles));
+    lines.push(pm!=null&&!isNaN(pm)
+      ? "Driver completing his previous delivery, "+pm+" miles from your shipper location."
+      : "Driver completing his previous delivery.");
+    lines.push("","We\u2019ll provide a better ETA once empty and rolling.");
+    return lines.join("\n");
+  }
   const miles=(s.miles==null||s.miles==="")?null:Math.round(Number(s.miles));
   const onsite=arrivalState(s)==="onsite";
   const atStop=!onsite&&isGpsAtStop(s, Date.now());
