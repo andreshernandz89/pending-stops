@@ -215,6 +215,12 @@ a.next-load { font-size: 12px; font-weight: 700; }
 .copyupd-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .copyupd-btn:hover { border-color: var(--accent); }
 .copyupd-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pdf-btn { display: inline-flex; align-items: center; justify-content: center; width: 29px; height: 29px; padding: 0; margin-left: 6px; border: 1px solid var(--border); border-radius: 50%; background: var(--surface); cursor: pointer; vertical-align: middle; text-decoration: none; }
+.pdf-btn:hover { border-color: #c62828; }
+.pdf-btn:focus-visible { outline: 2px solid #c62828; outline-offset: 2px; }
+.pdf-btn svg { width: 17px; height: 17px; display: block; }
+.pdf-mini { display: inline-flex; align-items: center; margin-left: 6px; vertical-align: middle; }
+.pdf-mini svg { width: 14px; height: 14px; display: block; }
 .copyupd-anchor { position: relative; display: inline-flex; }
 .copyupd-tooltip { position: absolute; left: 0; top: calc(100% + 8px); z-index: 40; width: max-content; max-width: min(290px, calc(100vw - 48px)); padding: 10px 12px; display: flex; flex-direction: column; gap: 2px; pointer-events: none; visibility: hidden; opacity: 0; transform: translateY(-3px); border: 1px solid rgba(255,255,255,.14); border-radius: 5px; color: #eef5f8; background: #0b1c2b; box-shadow: 0 10px 24px rgba(4,15,24,.28); font-size: 12px; line-height: 1.45; text-align: left; transition: opacity .12s ease, transform .12s ease, visibility .12s; }
 .copyupd-tooltip strong { font-size: 13px; color: #fff; }
@@ -485,6 +491,12 @@ function verifyBtnHtml(s){
   const t=String(s.truck);
   if(VERIFY[t]) return '<button class="stopdone-btn checking" disabled>Checking&hellip;</button>';
   return '<button class="stopdone-btn" data-verify="'+esc(t)+'" data-load="'+esc(s.load||"")+'" data-sosid="'+esc(s.sosId==null?"":String(s.sosId))+'">Update Stop</button>';
+}
+
+const PDF_ICON='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 2.5h7.5L18 7v14.5H6z" fill="#ffffff" stroke="#c62828" stroke-width="1.4"/><path d="M13.5 2.5 18 7h-4.5z" fill="#ef9a9a"/><rect x="4" y="13" width="16" height="6.4" rx="1.2" fill="#c62828"/><text x="12" y="17.9" text-anchor="middle" font-family="Arial, sans-serif" font-size="4.8" font-weight="700" fill="#ffffff">PDF</text></svg>';
+function lcDocHtml(s){
+  if(!s.lcDoc) return "";
+  return '<span class="copyupd-anchor"><a class="pdf-btn" href="'+esc(s.lcDoc)+'" target="_blank" rel="noopener" aria-label="View LC Document (rate confirmation) for load '+esc(s.load||"")+'">'+PDF_ICON+'</a><span class="copyupd-tooltip" role="tooltip"><strong>LC Document</strong><span>Opens this load&#8217;s rate confirmation (PDF) in a new tab.</span></span></span>';
 }
 
 /* ===== meta chips ===== */
@@ -758,7 +770,8 @@ function nextLoadHtml(s){
   const rtHtml = (nl.route||"").trim() ? '<span class="load-route">'+esc(nl.route)+'</span>' : '';
   if(!id) return '<span class="load-line"><span class="load-number next-load" title="Next load SOS link unavailable">'+esc(label)+'</span>'+rtHtml+'</span>';
   const href="https://pro-intermodal.sostruckingsoftware.com/app/long-loads-edit?id="+encodeURIComponent(id);
-  return '<span class="load-line"><a class="load-number next-load" href="'+esc(href)+'" target="_blank" rel="noopener noreferrer" aria-label="Open SOS next load '+esc(load)+'">'+esc(label)+'<span aria-hidden="true" class="external-mark">↗</span></a>'+rtHtml+'</span>';
+  const pdfHtml = nl.lcDoc ? '<a class="pdf-mini" href="'+esc(nl.lcDoc)+'" target="_blank" rel="noopener" title="LC Document of next load '+esc(load)+'" aria-label="View LC Document of next load '+esc(load)+'">'+PDF_ICON+'</a>' : '';
+  return '<span class="load-line"><a class="load-number next-load" href="'+esc(href)+'" target="_blank" rel="noopener noreferrer" aria-label="Open SOS next load '+esc(load)+'">'+esc(label)+'<span aria-hidden="true" class="external-mark">↗</span></a>'+pdfHtml+rtHtml+'</span>';
 }
 
 /* ===== tooltips ===== */
@@ -883,7 +896,7 @@ function rowHtml(s, nowMs){
     '<div class="time-cell'+(late?" late":"")+'">'+(arrivalState(s)==="onsite"?"":'<span class="mobile-label">ETA</span><span class="eta-label">'+etaTooltipHtml(s)+'</span>')+'</div>'+
     '<div class="miles-cell"><span class="mobile-label">Miles</span><span class="miles-wrap"><strong>'+(s.miles==null?"—":esc(fmtNum(s.miles)))+'</strong>'+
       routeIconHtml(s)+routeProgressHtml(s)+((s.stopIndex&&s.stopCount)?'<span class="stop-count">Stop '+s.stopIndex+'/'+s.stopCount+'</span>':"")+'</span></div>'+
-    '<div class="place-cell"><span>'+esc(s.parada||s.addr||"Address unavailable")+'</span>'+(s.prevDlvry?'<span class="prev-dlvry-pill">ON PREVIOUS DLVRY</span>':arrivalPillHtml(s)+gpsAtStopPillHtml(s,nowMs)+verifyBtnHtml(s))+(gpsActive(s,nowMs)?'<span class="copyupd-anchor"><button type="button" class="copyupd-btn" data-copyup="'+esc(s.id)+'" aria-label="Copy broker update email for truck '+esc(s.truck)+'"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></button><span class="copyupd-tooltip" role="tooltip"><strong>Copy broker update</strong><span>Copies an email-ready update for this truck: where it is now, miles to the stop and ETA, with OTP / OTD status for the appointment. Paste it into your email to the broker.</span><span class="copyupd-preview">'+esc(buildBrokerUpdate(s,null)).replace(/\n/g,"<br>")+'</span></span></span>':'')+'</div>'+
+    '<div class="place-cell"><span>'+esc(s.parada||s.addr||"Address unavailable")+'</span>'+(s.prevDlvry?'<span class="prev-dlvry-pill">ON PREVIOUS DLVRY</span>':arrivalPillHtml(s)+gpsAtStopPillHtml(s,nowMs)+verifyBtnHtml(s))+(gpsActive(s,nowMs)?'<span class="copyupd-anchor"><button type="button" class="copyupd-btn" data-copyup="'+esc(s.id)+'" aria-label="Copy broker update email for truck '+esc(s.truck)+'"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></button><span class="copyupd-tooltip" role="tooltip"><strong>Copy broker update</strong><span>Copies an email-ready update for this truck: where it is now, miles to the stop and ETA, with OTP / OTD status for the appointment. Paste it into your email to the broker.</span><span class="copyupd-preview">'+esc(buildBrokerUpdate(s,null)).replace(/\n/g,"<br>")+'</span></span></span>':'')+lcDocHtml(s)+'</div>'+
     noteCellHtml(s)+
   '</article>';
 }
