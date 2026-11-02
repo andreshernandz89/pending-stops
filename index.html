@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Pending Stops — Prointermodal</title>
+<title>Track & Trace — Prointermodal</title>
 <style>
 :root {
   --bg: #e8eef1;
@@ -44,6 +44,7 @@ button { -webkit-tap-highlight-color: transparent; }
 .signal-bar { position: sticky; top: 0; z-index: 30; min-height: 48px; padding: 8px 14px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; color: #eaf2f6; background: var(--navy); border-bottom: 1px solid rgba(255,255,255,.12); }
 :root[data-theme="dark"] .signal-bar { color: var(--text); }
 .brand { font-family: Bahnschrift, "Arial Narrow", sans-serif; font-size: 15px; font-weight: 800; letter-spacing: .06em; margin-right: auto; white-space: nowrap; }
+.brand-logo { height: 30px; width: auto; background: #fff; border-radius: 6px; padding: 2px 6px; vertical-align: middle; margin-right: 9px; }
 .theme-btn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 1px solid rgba(255,255,255,.26); border-radius: 5px; color: #eaf2f6; background: transparent; cursor: pointer; }
 :root[data-theme="dark"] .theme-btn { color: var(--text); border-color: var(--border); }
 .theme-btn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; }
@@ -287,7 +288,7 @@ a.next-load { font-size: 12px; font-weight: 700; }
 <body>
 <div class="app-shell">
   <header class="signal-bar">
-    <span class="brand">PENDING STOPS</span>
+    <span class="brand"><img class="brand-logo" src="logo-prointermodal.png" alt="Prointermodal">Track &amp; Trace</span>
     <button type="button" class="theme-btn" id="theme-toggle" aria-label="Toggle dark mode" title="Toggle dark mode">
       <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
       <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>
@@ -1178,7 +1179,7 @@ function exportExcel(){
     const ws=XLSX.utils.aoa_to_sheet([EXPORT_HEADERS].concat(data));
     ws["!cols"]=EXPORT_WIDTHS.map(w=>({wch:w}));
     const wb=XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Pending Stops");
+    XLSX.utils.book_append_sheet(wb, ws, "Track & Trace");
     XLSX.writeFile(wb, "pending-stops-"+stamp+".xlsx");
     return;
   }
